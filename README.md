@@ -1,0 +1,144 @@
+# AEO Monitor
+
+Measures how a brand appears inside AI assistants and generative search, and turns
+that into something you can act on.
+
+Built for the Nebius Academy take-home, Track C. Runs locally, stores history in
+SQLite, and exports a self-contained HTML report that needs no server and no keys.
+
+---
+
+## Run it
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env          # add ANTHROPIC_API_KEY (and APIFY_TOKEN if you have one)
+
+python -m aeo.run             # collect once
+uvicorn web.app:app --reload  # dashboard at http://127.0.0.1:8000
+```
+
+The dashboard's **Run live collection** button does the same thing from the browser
+and streams progress, so a walkthrough shows real data arriving rather than a
+screenshot of it.
+
+```bash
+python scripts/seed_synthetic.py --weeks 3   # marked backfill, so the trend view has a shape
+python -m aeo.report                         # -> out/aeo_report.html (one file, no server)
+```
+
+**Nothing installed and no keys?** It still runs. Every engine degrades to a declared
+seam and the dashboard renders them as seams — which is the point (see below).
+
+---
+
+## What it does
+
+```
+config/queries.yaml   the measurement contract — queries, brand aliases, competitors
+        │
+        ▼
+aeo/engines.py        Claude (web search) · Google AI Overviews (Apify) · 2 seams
+        │             every engine returns the same shape
+        ▼
+aeo/analyze.py        tier the mention · extract cited domains · find competitors
+        │
+        ▼
+aeo/db.py             SQLite: runs / observations / citations / competitors
+        │
+        ├── web/app.py        local dashboard, live collection, export
+        └── .github/workflows/aeo.yml   daily cron → the baseline
+```
+
+## Three decisions worth arguing about
+
+**1. Appearing is not binary.** *Cited* (the answer carried a link to us) and
+*mentioned* (named, no link) need different fixes, so they are different states.
+Collapsing them into "we appeared" throws away the actionable half.
+
+**2. The cited domains are the output.** AI answers ground on third-party sources,
+so the lever is usually **not** your own site. Ranking the domains the answers
+actually cite converts a dashboard into a list of places to go and get placed —
+closer to digital PR than to on-site SEO.
+
+**3. No composite 0–100 visibility score.** Every commercial tool in this category
+ships one. One number that moves for reasons you cannot recover is worse than three
+you can act on, so presence rate, citation share and the competitor set are reported
+separately and never blended.
+
+## Two things it refuses to fake
+
+**A seam is not an absence.** An engine with no credential is recorded as
+`unmeasured`, excluded from every rate, and drawn as a hatched cell. "We did not
+look" and "we looked and found nothing" are different findings and must never look
+alike — a rate whose denominator quietly includes unmeasured cells is exactly the
+error this tool exists to catch elsewhere.
+
+**Invented history is marked in the data, not the caption.** You cannot know what an
+assistant said last month; no API returns it. Backfill is flagged
+`runs.is_synthetic = 1` in the database, so no chart can render it as measured
+history by accident. It also draws as a shaded column with a warning beneath.
+
+## The instrument checks itself
+
+Assistant answers are non-deterministic. Ask the same question twice and the
+competitor set can change, so **a single snapshot is a sample, not a measurement**
+— and a monitor built on one sample reports noise as signal.
+
+So a subset of queries is asked more than once (`run.repeats`), disagreement is
+stored rather than averaged away, and the dashboard reports how many cells
+contradicted themselves. Movement smaller than that spread is not a result.
+Production would run five repeats and report a confidence band.
+
+`runs.query_set_hash` fingerprints the measurement contract. Change the queries and
+the trend line breaks instead of pretending the two halves are comparable.
+
+---
+
+## Answering the three questions
+
+**How I'd measure impact.** Baseline first: the same query set, daily, for two weeks,
+to establish the noise band — without it there is no way to tell an improvement from
+a re-roll. Then three metrics, separately: **presence rate** (any appearance),
+**cited rate** (appearances that earn a link), and **citation share** (our sources as
+a fraction of all cited sources). The leading indicator is citation share on the
+category queries; the lagging one is AI-referred sessions in analytics, which will
+stay near zero long after citations start moving.
+
+**How I'd scale it.** What breaks at 10× is the engine calls, not the analysis: this
+is one request per query per engine per repeat, run serially. Fan out with a worker
+pool and a per-engine rate limiter, move the store from SQLite to Postgres, and cache
+answers by content hash so a re-run doesn't re-buy an unchanged answer. Next builds,
+in order: the two seam engines made live; an LLM extraction pass for competitor
+discovery, which currently only finds rivals cited from their own domains; per-market
+query sets (DE/PL/NL), since AI answers are locale-sensitive and this measures one
+locale only; and alerting on movement outside the noise band rather than a dashboard
+someone has to remember to open.
+
+**One tradeoff, and what production would do differently.** ChatGPT and Perplexity are
+**mocked** — no keys on this account. I chose to make the seam explicit rather than
+quietly report a smaller matrix, because a missing engine that looks like an absence
+would corrupt every rate on the page. Each is one function with the same signature as
+the live ones; it is a credential gap, not a design gap. The second tradeoff is the
+locale: one query set, one market. Both were scope calls against the four-hour cap,
+not discoveries.
+
+---
+
+## Layout
+
+| Path | What it is |
+|---|---|
+| `config/queries.yaml` | queries, brand aliases, products, competitor seeds, engines, repeats |
+| `aeo/engines.py` | one adapter per surface, common return shape |
+| `aeo/analyze.py` | mention tiers, cited domains, competitors, aggregation |
+| `aeo/db.py` | SQLite schema and access |
+| `aeo/run.py` | the collector (`python -m aeo.run`) |
+| `aeo/report.py` | standalone HTML export (`python -m aeo.report`) |
+| `web/app.py` + `web/static/index.html` | local dashboard, single file, no build step |
+| `scripts/seed_synthetic.py` | marked backfill |
+| `.github/workflows/aeo.yml` | daily cron |
+
+Secrets live in `.env` (gitignored) and in GitHub Actions secrets. A secret not
+listed under `env:` in the workflow never reaches the run, and fails as a silent
+zero rather than an error.

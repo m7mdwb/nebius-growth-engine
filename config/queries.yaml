@@ -1,0 +1,145 @@
+# AEO monitor — the measurement contract.
+#
+# Everything the run depends on lives here, so a change to what we measure is a
+# config change with a diff, not a code change. That matters more than it looks:
+# a trend line is only comparable if the query set behind it did not move.
+
+brand:
+  name: Nebius Academy
+  # Matched case-insensitively on word boundaries. Order matters only for reporting.
+  aliases:
+    - Nebius Academy
+    - Nebius AI Academy
+  # Products, tracked separately so we can tell brand-level from product-level
+  # visibility. A product can be cited while the brand is absent.
+  products:
+    - name: Skillcheck
+      aliases: [Skillcheck, Skill Check]
+    - name: AI Learning Platform
+      aliases: [Nebius AI Learning Platform]
+    - name: Evolve
+      aliases: [Nebius Evolve]
+  # ⚠️ Disambiguation. "Nebius" alone is the parent AI-infrastructure company and
+  # an answer about GPU cloud is NOT an education-brand mention. A bare "Nebius"
+  # only counts when the surrounding text is about training/learning/upskilling.
+  ambiguous:
+    - term: Nebius
+      requires_context: [academy, training, learning, upskill, course, education, skills]
+  # Sibling brand. Tracked, never counted as the brand.
+  related:
+    - TripleTen
+
+domains:
+  owned:
+    - nebius.com
+    - academy.nebius.com
+    - tripleten.com
+
+# Seeds only. The extractor also discovers competitors we never listed — that
+# discovery is the point, since the ones we don't know about are the finding.
+competitor_seeds:
+  - Coursera
+  - Udemy
+  - Udacity
+  - Pluralsight
+  - DataCamp
+  - Skillsoft
+  - Degreed
+  - LinkedIn Learning
+  - Section
+  - Multiverse
+  - O'Reilly
+  - Google Cloud Skills Boost
+  - AWS Skill Builder
+  - Microsoft Learn
+  - Docebo
+  - 360Learning
+  - Sana Labs
+  - BCG
+  - McKinsey
+  - Deloitte
+
+engines:
+  claude:
+    enabled: true
+    live: true
+    model: claude-sonnet-5
+    max_tokens: 2000
+  ai_overviews:
+    enabled: true
+    live: true          # via Apify; falls back to a marked seam if APIFY_TOKEN is absent
+    country: us
+  chatgpt:
+    enabled: true
+    live: false         # SEAM — no key. Returns fixture data, flagged in the UI.
+  perplexity:
+    enabled: true
+    live: false         # SEAM — no key. Returns fixture data, flagged in the UI.
+
+run:
+  # Repeats per query per engine. THIS IS THE POINT: LLM answers are
+  # non-deterministic, so one sample is not a measurement. 3 is the demo setting;
+  # production would run 5 and report a confidence band.
+  repeats: 3
+  # Only repeat this many queries (the rest run once) to keep a demo run cheap.
+  # Set to null to repeat every query.
+  repeat_subset: 4
+  locale: en-US
+
+queries:
+  # --- Category. Highest commercial intent, hardest to win. ---
+  - id: q01
+    text: best AI readiness training for enterprises
+    intent: category
+  - id: q02
+    text: best corporate AI upskilling programs
+    intent: category
+  - id: q03
+    text: enterprise AI training providers
+    intent: category
+
+  # --- Problem-shaped. Asked before the buyer knows any vendor exists. ---
+  - id: q04
+    text: how do we upskill our team on AI
+    intent: problem
+  - id: q05
+    text: our employees aren't using AI, where do we start
+    intent: problem
+  - id: q06
+    text: how to build an AI adoption program for a 500-person company
+    intent: problem
+
+  # --- Comparison. The buyer already has a shortlist; are we on it? ---
+  - id: q07
+    text: Coursera vs Udemy for enterprise AI training
+    intent: comparison
+  - id: q08
+    text: build vs buy AI training for employees
+    intent: comparison
+  - id: q09
+    text: alternatives to enterprise AI bootcamps
+    intent: comparison
+
+  # --- Assessment. Skillcheck's territory. ---
+  - id: q10
+    text: AI skills assessment tools for enterprises
+    intent: assessment
+  - id: q11
+    text: how to measure employee AI readiness
+    intent: assessment
+
+  # --- Buying process. Late funnel, high intent, low competition. ---
+  - id: q12
+    text: how much does corporate AI training cost
+    intent: buying
+  - id: q13
+    text: what should an enterprise AI training RFP include
+    intent: buying
+
+  # --- Branded controls. If we lose these, nothing else matters. ---
+  - id: q14
+    text: Nebius Academy reviews
+    intent: branded
+  - id: q15
+    text: what is Nebius Academy
+    intent: branded

@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AEO Monitor</title>
+<!--EMBED-->
+<style>
+/* One file on purpose: the same page serves the local app and the standalone
+   export, so styles and script are inline and nothing is fetched. */
+:root{
+  color-scheme: light;
+  --surface-1:#fcfcfb; --surface-2:#f4f3ef; --plane:#f9f9f7;
+  --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+  --series-1:#2a78d6; --series-2:#eb6834;
+  --good:#0ca30c; --warning:#fab219; --critical:#d03b3b;
+  --cell-cited:#0ca30c; --cell-mentioned:#fab219; --cell-absent:#f4f3ef;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --surface-1:#1a1a19; --surface-2:#232322; --plane:#0d0d0d;
+    --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+    --series-1:#3987e5; --series-2:#d95926;
+    --cell-absent:#232322;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --surface-1:#1a1a19; --surface-2:#232322; --plane:#0d0d0d;
+  --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+  --series-1:#3987e5; --series-2:#d95926;
+  --cell-absent:#232322;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  background:var(--plane); color:var(--ink);
+  font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1220px;margin:0 auto;padding:26px 20px 60px}
+
+header{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
+h1{font-size:22px;font-weight:700;letter-spacing:-.3px}
+h1 span{color:var(--muted);font-weight:400}
+.meta{font-size:12.5px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+button{
+  font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;
+  background:var(--surface-1);color:var(--ink);
+  border:1px solid var(--axis);border-radius:7px;padding:8px 14px;
+}
+button:hover:not(:disabled){background:var(--surface-2)}
+button:disabled{opacity:.5;cursor:default}
+button.primary{background:var(--series-1);border-color:var(--series-1);color:#fff}
+
+section{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:16px}
+h2{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.sub{font-size:13px;color:var(--ink-2);margin-bottom:14px;max-width:74ch}
+
+/* ---- stat tiles: hero numbers, no chart ---- */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.tile{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.tile b{display:block;font-size:29px;font-weight:700;line-height:1.05;letter-spacing:-.5px}
+.tile span{display:block;font-size:12px;color:var(--muted);margin-top:5px}
+.tile small{display:block;font-size:11.5px;color:var(--ink-2);margin-top:6px}
+
+/* ---- query x engine grid ---- */
+.gridwrap{overflow-x:auto}
+table{border-collapse:separate;border-spacing:2px;width:100%;min-width:640px;table-layout:fixed}
+th{font-size:11.5px;font-weight:600;color:var(--muted);text-align:center;padding:0 4px 6px;white-space:nowrap}
+th.q{text-align:left;width:38%}
+td.q{font-size:13px;color:var(--ink);padding:0 10px 0 2px;line-height:1.35}
+td.q em{display:block;font-style:normal;font-size:10.5px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-top:1px}
+td.cell{height:34px;text-align:center;border-radius:5px;font-size:12px;font-weight:700;color:#fff;position:relative}
+.s-cited{background:var(--cell-cited)}
+.s-mentioned{background:var(--cell-mentioned);color:#2a1f00}
+.s-absent{background:var(--cell-absent);color:var(--muted);border:1px solid var(--grid)}
+.s-seam{
+  color:var(--muted);border:1px dashed var(--axis);
+  background:repeating-linear-gradient(45deg,transparent,transparent 4px,var(--grid) 4px,var(--grid) 6px);
+}
+.cell .split{position:absolute;top:2px;right:4px;font-size:10px;font-weight:700;opacity:.95}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:12.5px;color:var(--ink-2)}
+.legend i{display:inline-block;width:13px;height:13px;border-radius:3px;vertical-align:-2px;margin-right:6px}
+
+/* ---- horizontal bars ---- */
+.bars{display:flex;flex-direction:column;gap:8px}
+/* Label sits in its own column, never on top of the fill. Text over a series
+   colour is a contrast gamble that changes with every theme; text on the
+   surface is legible in both. */
+.bar{display:grid;grid-template-columns:minmax(0,150px) 1fr 40px;gap:11px;align-items:center}
+.bar .lab{display:flex;align-items:center;gap:6px;min-width:0;font-size:12.5px;color:var(--ink)}
+.bar .lab b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar .track{background:var(--surface-2);border-radius:4px;height:20px;overflow:hidden}
+.bar .fill{height:100%;background:var(--series-1);border-radius:0 4px 4px 0}
+.bar .fill.owned{background:var(--good)}
+.bar .n{text-align:right;font-size:12.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.tag{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--good);border:1px solid var(--good);border-radius:3px;padding:0 4px}
+
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:880px){.two{grid-template-columns:1fr}}
+
+/* ---- trend ---- */
+svg{display:block;width:100%;height:auto;overflow:visible}
+.axis-lab{font-size:11px;fill:var(--muted)}
+.gridline{stroke:var(--grid);stroke-width:1}
+.baseline{stroke:var(--axis);stroke-width:1}
+.serieslab{font-size:11.5px;font-weight:600}
+
+.note{background:var(--surface-2);border-left:3px solid var(--series-1);border-radius:0 6px 6px 0;padding:11px 14px;font-size:13.5px;color:var(--ink-2);margin-top:14px}
+.note b{color:var(--ink)}
+.warn{border-left-color:var(--warning)}
+
+/* ---- run log ---- */
+#runpanel{display:none}
+#runpanel.on{display:block}
+.progress{height:5px;background:var(--surface-2);border-radius:3px;overflow:hidden;margin-bottom:10px}
+.progress i{display:block;height:100%;background:var(--series-1);width:0;transition:width .25s}
+#log{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--ink-2);max-height:190px;overflow:auto;white-space:pre;line-height:1.6}
+
+.empty{text-align:center;color:var(--muted);padding:44px 0;font-size:14px}
+ol.recs{margin:0 0 0 20px;font-size:14px;color:var(--ink-2)}
+ol.recs li{margin-bottom:9px}
+ol.recs b{color:var(--ink)}
+footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>AEO Monitor <span id="brand"></span></h1>
+    <div class="meta" id="runmeta">loading…</div>
+  </div>
+  <div class="actions" id="actions">
+    <button id="btnrun" class="primary">Run live collection</button>
+    <button id="btnexport">Export standalone HTML</button>
+    <button id="btntheme">Theme</button>
+  </div>
+</header>
+
+<section id="runpanel">
+  <h2>Collecting</h2>
+  <div class="progress"><i id="pbar"></i></div>
+  <div id="log"></div>
+</section>
+
+<div id="app"><div class="empty">No runs yet. Press <b>Run live collection</b>.</div></div>
+
+<footer>
+  Presence, citation share and the competitor set are reported separately and never
+  blended into a single visibility score — one number that moves for reasons you
+  can't recover is worse than three you can act on.
+  <span id="hash"></span>
+</footer>
+
+</div>
+
+<script>
+const EMBED = window.__AEO_DATA__ || null;
+const $ = (s, r) => (r || document).querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pct = n => (n == null ? "—" : n + "%");
+
+async function api(p, o) {
+  const r = await fetch(p, o);
+  if (!r.ok) throw new Error(p + " -> " + r.status);
+  return r.json();
+}
+
+/* ---------------------------------------------------------------- render */
+
+function tiles(s) {
+  const v = s.variance || {};
+  return `<div class="tiles">
+    <div class="tile"><b>${pct(s.presence_rate)}</b><span>Presence rate</span>
+      <small>appears at all, across ${s.observations} live readings</small></div>
+    <div class="tile"><b>${pct(s.cited_rate)}</b><span>Cited with a link</span>
+      <small>the share that earns a source, not just a name</small></div>
+    <div class="tile"><b>${pct(s.citation_share)}</b><span>Citation share</span>
+      <small>${s.owned_citations} of ${s.total_citations} cited sources are ours</small></div>
+    <div class="tile"><b>${pct(v.unstable_pct)}</b><span>Unstable cells</span>
+      <small>${v.unstable_cells}/${v.repeated_cells} repeated queries changed answer between runs</small></div>
+  </div>`;
+}
+
+function grid(d) {
+  const by = {};
+  d.grid.forEach(c => { (by[c.query_id] = by[c.query_id] || {})[c.engine] = c; });
+
+  const head = d.engines.map(e => `<th>${esc(e.label)}</th>`).join("");
+  const rows = d.queries.map(q => {
+    const cells = d.engines.map(e => {
+      const c = (by[q.id] || {})[e.key];
+      // No row at all is still "we did not look" — it renders as a seam, never
+      // as absent. Same rule as an engine with no credential.
+      if (!c) return `<td class="cell s-seam" title="no reading recorded for this cell">seam</td>`;
+      if (!c.live) {
+        const t = esc(c.note || c.error || "not measured");
+        return `<td class="cell s-seam" title="${t}">seam</td>`;
+      }
+      const uniq = [...new Set(c.statuses)];
+      const label = uniq.length === 1 ? uniq[0] : "split";
+      const cls = uniq.length === 1 ? "s-" + uniq[0] : "s-mentioned";
+      const n = c.statuses.length > 1 ? `<span class="split">${c.statuses.length}×</span>` : "";
+      const title = esc(c.statuses.join(" / "));
+      return `<td class="cell ${cls}" title="${title}">${label}${n}</td>`;
+    }).join("");
+    return `<tr><td class="q">${esc(q.text)}<em>${esc(q.intent)}</em></td>${cells}</tr>`;
+  }).join("");
+
+  return `<section>
+    <h2>Where we appear</h2>
+    <p class="sub">One cell per query and engine. <b>Cited</b> means the answer carried a link
+      to us; <b>mentioned</b> means we were named without one. They need different fixes, so
+      they are different states. A hatched cell was not measured — that is not the same as
+      being absent, and the grid never lets the two look alike.</p>
+    <div class="gridwrap"><table>
+      <thead><tr><th class="q">Query</th>${head}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <div class="legend">
+      <span><i style="background:var(--cell-cited)"></i>Cited — named with a source link</span>
+      <span><i style="background:var(--cell-mentioned)"></i>Mentioned — named, no link</span>
+      <span><i style="background:var(--cell-absent);border:1px solid var(--grid)"></i>Absent</span>
+      <span><i class="s-seam" style="border-radius:3px"></i>Seam — not measured</span>
+      <span><b>n×</b> = repeated readings; hover a cell for each one</span>
+    </div>
+  </section>`;
+}
+
+function bars(title, sub, rows, key, labelKey, ownedKey) {
+  if (!rows.length) return `<section><h2>${title}</h2><p class="sub">${sub}</p>
+    <div class="empty">Nothing recorded yet.</div></section>`;
+  const max = Math.max(...rows.map(r => r[key])) || 1;
+  const body = rows.map(r => {
+    const owned = ownedKey && r[ownedKey];
+    return `<div class="bar">
+      <div class="lab" title="${esc(r[labelKey])}"><b>${esc(r[labelKey])}</b>${owned ? '<span class="tag">ours</span>' : ""}</div>
+      <div class="track">
+        <div class="fill ${owned ? "owned" : ""}" style="width:${Math.round(100 * r[key] / max)}%"></div>
+      </div>
+      <div class="n">${r[key]}</div>
+    </div>`;
+  }).join("");
+  return `<section><h2>${title}</h2><p class="sub">${sub}</p><div class="bars">${body}</div></section>`;
+}
+
+function trend(points) {
+  const real = points.filter(p => p.comparable !== false);
+  if (real.length < 2) {
+    return `<section><h2>Over time</h2>
+      <p class="sub">Two comparable runs are needed before a line means anything.
+        Runs collected under a different query set are excluded rather than drawn as a
+        smooth curve — the contract hash decides comparability.</p>
+      <div class="empty">${real.length} run${real.length === 1 ? "" : "s"} so far.</div></section>`;
+  }
+  const W = 900, H = 210, P = { t: 14, r: 116, b: 26, l: 34 };
+  const iw = W - P.l - P.r, ih = H - P.t - P.b;
+  const x = i => P.l + (real.length === 1 ? iw / 2 : iw * i / (real.length - 1));
+  const y = v => P.t + ih - (ih * Math.min(100, v) / 100);
+
+  const line = (k) => real.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).join("");
+  const dots = (k, c) => real.map((p, i) =>
+    `<circle cx="${x(i).toFixed(1)}" cy="${y(p[k]).toFixed(1)}" r="4"
+      fill="${c}" stroke="var(--surface-1)" stroke-width="2">
+      <title>${esc(p.at)} — ${p[k]}%${p.synthetic ? " (synthetic backfill)" : ""}</title></circle>`).join("");
+
+  const gridlines = [0, 25, 50, 75, 100].map(v =>
+    `<line class="gridline" x1="${P.l}" x2="${P.l + iw}" y1="${y(v)}" y2="${y(v)}"/>
+     <text class="axis-lab" x="${P.l - 7}" y="${y(v) + 4}" text-anchor="end">${v}</text>`).join("");
+
+  const synth = real.filter(p => p.synthetic).map((p, i) =>
+    `<rect x="${x(real.indexOf(p)) - 9}" y="${P.t}" width="18" height="${ih}"
+      fill="var(--grid)" opacity=".45"/>`).join("");
+
+  const last = real[real.length - 1];
+  const anyS = real.some(p => p.synthetic);
+
+  return `<section><h2>Over time</h2>
+    <p class="sub">Same queries, same engines, one point per run. Shaded columns are
+      <b>synthetic backfill</b>, marked in the data itself and not just in this caption —
+      you cannot know what an assistant said last month, so inventing it silently would be
+      the exact error this tool exists to catch.</p>
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Presence rate and citation share by run">
+      ${synth}${gridlines}
+      <line class="baseline" x1="${P.l}" x2="${P.l + iw}" y1="${y(0)}" y2="${y(0)}"/>
+      <path d="${line("presence_rate")}" fill="none" stroke="var(--series-1)" stroke-width="2"/>
+      <path d="${line("citation_share")}" fill="none" stroke="var(--series-2)" stroke-width="2"/>
+      ${dots("presence_rate", "var(--series-1)")}${dots("citation_share", "var(--series-2)")}
+      <text class="serieslab" x="${P.l + iw + 10}" y="${y(last.presence_rate) + 4}" fill="var(--series-1)">Presence ${last.presence_rate}%</text>
+      <text class="serieslab" x="${P.l + iw + 10}" y="${y(last.citation_share) + 4}" fill="var(--series-2)">Citation share ${last.citation_share}%</text>
+    </svg>
+    ${anyS ? '<div class="note warn"><b>This chart contains synthetic backfill.</b> Only the unshaded points were measured.</div>' : ""}
+  </section>`;
+}
+
+function method(s, d) {
+  const v = s.variance || {};
+  const unstable = v.unstable_cells || 0;
+  return `<section>
+    <h2>Is the instrument trustworthy?</h2>
+    <p class="sub">Assistant answers are non-deterministic. Asking the same question twice
+      can return a different set of names, so a single snapshot is a sample, not a
+      measurement — and a monitoring tool built on one sample reports noise as signal.</p>
+    <div class="note ${unstable ? "warn" : ""}">
+      <b>${v.repeated_cells || 0} cells were read more than once, and ${unstable} of them
+      disagreed with themselves.</b>
+      ${unstable
+        ? "So any movement smaller than that spread is not a result. Production would run five repeats per cell and report a rate with a confidence band, flagging change only outside the noise."
+        : "Stable across repeats in this run, which is a finding rather than an assumption — it is only known because the repeats were collected."}
+    </div>
+    <div class="note"><b>What this does not do.</b> No composite 0–100 visibility score.
+      Presence, citation share and the competitor set move for different reasons and have
+      different fixes, so blending them would destroy the only actionable part.</div>
+  </section>`;
+}
+
+function recommendations(s) {
+  const top = (s.domains || []).filter(d => !d.is_owned).slice(0, 3).map(d => d.domain);
+  const rivals = (s.competitors || []).slice(0, 3).map(c => c.name);
+  return `<section>
+    <h2>What I would do about it</h2>
+    <p class="sub">Written from this run's data. Replace with your own before sending —
+      these are the shape of the recommendation, not the recommendation.</p>
+    <ol class="recs">
+      <li><b>Go where the answers are grounded, not where you wish they were.</b>
+        ${top.length ? `The answers cite <b>${top.map(esc).join("</b>, <b>")}</b> most often.`
+                     : "Rank the cited domains once there is a run behind this."}
+        Almost none of that is your own site, so the work is closer to digital PR and
+        third-party placement than to on-site SEO.</li>
+      <li><b>Fix the branded queries first.</b> If an assistant is unreliable on your own
+        name, nothing further up the funnel is worth optimising yet.</li>
+      <li><b>Attack the category query.</b> Being absent where buyers ask "best…" is worth
+        more than incremental gains where you already appear.</li>
+      <li><b>Track the rivals who own the answer today.</b>
+        ${rivals.length ? `Currently <b>${rivals.map(esc).join("</b>, <b>")}</b>.` : ""}
+        Their citation sources are the target list.</li>
+      <li><b>Set the baseline before changing anything.</b> Run the same query set daily for
+        two weeks to establish the noise band, so the first real improvement is legible.</li>
+    </ol>
+  </section>`;
+}
+
+function render(d, t) {
+  $("#brand").textContent = d.brand ? "· " + d.brand : "";
+  const r = d.run || {};
+  $("#runmeta").textContent = r.started_at
+    ? `run ${r.id} · ${r.started_at} · engines: ${r.engines || "—"}`
+    : "no completed runs";
+  $("#hash").textContent = r.query_set_hash ? " · contract " + r.query_set_hash : "";
+
+  const s = d.summary;
+  const synthBanner = r.is_synthetic
+    ? `<div class="note warn" style="margin:0 0 16px"><b>Every number on this page comes from
+       synthetic backfill.</b> No measured run exists in this database yet, so seeded data is
+       being shown so the interface is legible. Run a live collection before reading anything
+       here as a result.</div>`
+    : "";
+
+  $("#app").innerHTML =
+    synthBanner +
+    tiles(s) +
+    grid(d) +
+    `<div class="two">` +
+      bars("Where the answers come from",
+           "Domains the assistants actually cited. This is the lever: the ones you don't own are the placement target.",
+           s.domains, "citations", "domain", "is_owned") +
+      bars("Who owns the category today",
+           "Names appearing in the answers, seeded plus discovered from cited domains.",
+           s.competitors, "appearances", "name") +
+    `</div>` +
+    trend(t) +
+    method(s, d) +
+    recommendations(s) +
+    (d.stale_contract
+      ? `<div class="note warn"><b>This run used a different query set from the current config.</b>
+         It is shown, but it is not comparable with the latest runs.</div>` : "");
+}
+
+/* ------------------------------------------------------------------ load */
+
+async function load() {
+  const d = EMBED ? EMBED.report : await api("/api/report");
+  if (!d || d.empty) {
+    $("#app").innerHTML = '<div class="empty">No completed run in this export.</div>';
+    return;
+  }
+  render(d, EMBED ? EMBED.trend : await api("/api/trend"));
+}
+
+/* ------------------------------------------------------------- live run */
+
+async function poll() {
+  const st = await api("/api/status");
+  $("#pbar").style.width = st.steps ? (100 * st.step / st.steps) + "%" : "0%";
+  $("#log").textContent = st.log.map(e =>
+    e.event === "error" ? "ERROR " + e.message
+    : `[${String(e.step).padStart(3)}/${e.steps}] ${e.engine.padEnd(14)}` +
+      `${String(e.status).padEnd(10)}${String(e.citations).padStart(2)} cites  ` +
+      `${e.query.slice(0, 44)}${e.live ? "" : "   [seam]"}`
+  ).join("\n");
+  $("#log").scrollTop = 1e6;
+  if (st.running) { setTimeout(poll, 600); return; }
+  $("#btnrun").disabled = false;
+  $("#btnrun").textContent = "Run live collection";
+  await load();
+}
+
+if (!EMBED) {
+  $("#btnrun").onclick = async () => {
+    $("#btnrun").disabled = true;
+    $("#btnrun").textContent = "Collecting…";
+    $("#runpanel").classList.add("on");
+    $("#log").textContent = "";
+    await api("/api/run", { method: "POST" });
+    poll();
+  };
+  $("#btnexport").onclick = async () => {
+    $("#btnexport").disabled = true;
+    const r = await api("/api/export", { method: "POST" });
+    $("#btnexport").textContent = "Written to " + r.path.split(/[\\/]/).pop();
+    setTimeout(() => { $("#btnexport").disabled = false; $("#btnexport").textContent = "Export standalone HTML"; }, 4000);
+  };
+} else {
+  $("#actions").innerHTML = '<button id="btntheme">Theme</button>';
+}
+
+document.addEventListener("click", e => {
+  if (e.target && e.target.id === "btntheme") {
+    const dark = document.documentElement.getAttribute("data-theme") === "dark";
+    document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+  }
+});
+
+load();
+</script>
+</body>
+</html>
