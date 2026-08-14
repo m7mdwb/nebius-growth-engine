@@ -95,6 +95,46 @@ the trend line breaks instead of pretending the two halves are comparable.
 
 ---
 
+## Track A — inbound lead engine (second tab)
+
+```bash
+python -c "from aeo import leads; leads.collect()"
+```
+Or the **Run lead engine** button on the Track A tab.
+
+A raw form fill goes in; an enriched, scored, routed lead with a drafted first touch
+comes out. Five sample leads, five different outcomes — every branch is exercised.
+
+**Rules decide, the model writes.** Scoring is arithmetic over `config/leads.yaml`.
+Ask an LLM to score a lead out of 100 and you get a confident number it cannot
+reproduce twice and nobody can audit. The model's job is the one thing rules genuinely
+cannot do: write a sentence that sounds like a person. Every point in the score shows
+where it came from.
+
+**Disqualifiers run before scoring, and they are absolute.** A strong firmographic
+profile must never outvote "personal email, no company". Letting a disqualified lead
+win on points is the commonest way one of these quietly poisons a pipeline.
+
+**Unenrichable is not low-scoring.** A lead we could not look up routes to a human, not
+to the bottom of the list — the same seam-versus-absence rule the AEO side uses. It
+matters more here, because nobody goes looking for the leads that never arrived.
+
+**The draft must cite its evidence.** The model returns which record fields it used. A
+draft citing nothing is a mail-merge in costume, and the dashboard counts those.
+
+### Two bugs the sample set caught
+
+**`intern` matched inside "no INTERNal training capability"** and disqualified a real
+L&D Manager. Substring matching, failing silently toward rejection. Now word-boundary
+matched — the same class of bug as `usa` inside `Lausanne`.
+
+**Fit alone routed a no-intent lead to sales on a five-minute SLA.** Someone who
+registered for a webinar and never attended, earning the slot purely on headcount,
+seniority and industry. Fit and intent are separate gates now; a big company with the
+right job title is not a buying signal.
+
+---
+
 ## Answering the three questions
 
 **How I'd measure impact.** Baseline first: the same query set, daily, for two weeks,

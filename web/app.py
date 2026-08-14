@@ -189,3 +189,67 @@ def api_status() -> JSONResponse:
 def api_export() -> JSONResponse:
     path = report.export()
     return JSONResponse({"path": str(path)})
+
+
+# --------------------------------------------------------------------------
+# Track A
+# --------------------------------------------------------------------------
+
+@app.get("/api/leads")
+def api_leads() -> JSONResponse:
+    from aeo import leads as L
+    fit = L.load_fit()
+    with db.session() as conn:
+        rid = db.latest_lead_run_id(conn)
+        if rid is None:
+            return JSONResponse({"empty": True})
+        run = db.lead_run(conn, rid)
+        rows = db.leads(conn, rid)
+
+    for r in rows:
+        r["intent"] = L.intent_points(r["breakdown"])
+
+    return JSONResponse({
+        "empty": False,
+        "run": run,
+        "leads": rows,
+        "summary": L.summarise(rows),
+        "routing": fit.routing,
+        "stale_fit": bool(run and run.get("fit_hash") and run["fit_hash"] != fit.fit_hash),
+    })
+
+
+@app.post("/api/leads/run")
+def api_leads_run() -> JSONResponse:
+    with _lock:
+        if _state["running"]:
+            return JSONResponse({"started": False, "reason": "a run is already going"})
+        _state.update(running=True, log=[], step=0, steps=0, run_id=None)
+
+    def progress(ev: dict) -> None:
+        with _lock:
+            if ev["event"] == "run_started":
+                _state["steps"] = ev["steps"]
+                _state["run_id"] = ev["run_id"]
+            elif ev["event"] == "result":
+                _state["step"] = ev["step"]
+                _state["log"].append({
+                    "event": "result", "step": ev["step"], "steps": ev["steps"],
+                    "engine": ev["route"], "status": f"score {ev['score']}",
+                    "citations": 1 if ev["drafted"] else 0,
+                    "query": ev["email"], "live": ev["drafted"],
+                })
+
+    def worker() -> None:
+        from aeo import leads as L
+        try:
+            L.collect(on_progress=progress)
+        except Exception as exc:  # noqa: BLE001
+            with _lock:
+                _state["log"].append({"event": "error", "message": f"{type(exc).__name__}: {exc}"})
+        finally:
+            with _lock:
+                _state["running"] = False
+
+    threading.Thread(target=worker, daemon=True).start()
+    return JSONResponse({"started": True})

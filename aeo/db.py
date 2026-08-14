@@ -73,6 +73,42 @@ CREATE TABLE IF NOT EXISTS competitors (
     discovered      INTEGER NOT NULL DEFAULT 0  -- 1 = not in the seed list
 );
 
+-- Track A ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS lead_runs (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at      TEXT    NOT NULL,
+    finished_at     TEXT,
+    fit_hash        TEXT,                       -- fingerprint of the fit definition
+    notes           TEXT
+);
+
+CREATE TABLE IF NOT EXISTS leads (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id          INTEGER NOT NULL REFERENCES lead_runs(id) ON DELETE CASCADE,
+    email           TEXT    NOT NULL,
+    name            TEXT,
+    company         TEXT,
+    domain          TEXT,
+    source          TEXT,
+    enriched        INTEGER NOT NULL DEFAULT 0, -- 0 = we could not look it up
+    industry        TEXT,
+    headcount       INTEGER,
+    seniority       TEXT,
+    job_function    TEXT,
+    title           TEXT,
+    score           INTEGER,
+    breakdown       TEXT,                       -- JSON: every point and where it came from
+    route           TEXT    NOT NULL,
+    route_why       TEXT,                       -- the reasoning, stored WITH the decision
+    sla_minutes     INTEGER,
+    disqualified    TEXT,                       -- reason, or NULL
+    message         TEXT,
+    evidence        TEXT,                       -- JSON: which facts the draft used
+    error           TEXT
+);
+
+CREATE INDEX IF NOT EXISTS ix_leads_run   ON leads(run_id);
+
 CREATE INDEX IF NOT EXISTS ix_obs_run     ON observations(run_id);
 CREATE INDEX IF NOT EXISTS ix_obs_query   ON observations(query_id, engine);
 CREATE INDEX IF NOT EXISTS ix_cit_run     ON citations(run_id);
@@ -244,3 +280,63 @@ def citations(conn: sqlite3.Connection, run_id: int) -> list[dict]:
 def competitors(conn: sqlite3.Connection, run_id: int) -> list[dict]:
     rows = conn.execute("SELECT * FROM competitors WHERE run_id = ?", (run_id,)).fetchall()
     return [dict(r) for r in rows]
+
+
+# --------------------------------------------------------------------------
+# Track A
+# --------------------------------------------------------------------------
+
+def start_lead_run(conn: sqlite3.Connection, *, fit_hash: str | None = None) -> int:
+    cur = conn.execute(
+        "INSERT INTO lead_runs (started_at, fit_hash) VALUES (?,?)", (now(), fit_hash)
+    )
+    return int(cur.lastrowid)
+
+
+def finish_lead_run(conn: sqlite3.Connection, run_id: int, notes: str | None = None) -> None:
+    conn.execute("UPDATE lead_runs SET finished_at = ?, notes = ? WHERE id = ?",
+                 (now(), notes, run_id))
+
+
+def record_lead(conn: sqlite3.Connection, run_id: int, lead: dict) -> None:
+    import json as _json
+    conn.execute(
+        "INSERT INTO leads (run_id, email, name, company, domain, source, enriched, "
+        " industry, headcount, seniority, job_function, title, score, breakdown, "
+        " route, route_why, sla_minutes, disqualified, message, evidence, error) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (
+            run_id, lead["email"], lead.get("name"), lead.get("company"),
+            lead.get("domain"), lead.get("source"), int(lead.get("enriched", 0)),
+            lead.get("industry"), lead.get("headcount"), lead.get("seniority"),
+            lead.get("job_function"), lead.get("title"), lead.get("score"),
+            _json.dumps(lead.get("breakdown") or []), lead["route"],
+            lead.get("route_why"), lead.get("sla_minutes"), lead.get("disqualified"),
+            lead.get("message"), _json.dumps(lead.get("evidence") or []), lead.get("error"),
+        ),
+    )
+
+
+def latest_lead_run_id(conn: sqlite3.Connection) -> int | None:
+    row = conn.execute(
+        "SELECT id FROM lead_runs WHERE finished_at IS NOT NULL "
+        "ORDER BY started_at DESC, id DESC LIMIT 1"
+    ).fetchone()
+    return int(row["id"]) if row else None
+
+
+def lead_run(conn: sqlite3.Connection, run_id: int) -> dict | None:
+    row = conn.execute("SELECT * FROM lead_runs WHERE id = ?", (run_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def leads(conn: sqlite3.Connection, run_id: int) -> list[dict]:
+    import json as _json
+    rows = conn.execute("SELECT * FROM leads WHERE run_id = ? ORDER BY id", (run_id,)).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["breakdown"] = _json.loads(d.get("breakdown") or "[]")
+        d["evidence"] = _json.loads(d.get("evidence") or "[]")
+        out.append(d)
+    return out

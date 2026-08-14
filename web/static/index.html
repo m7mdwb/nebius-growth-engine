@@ -122,6 +122,37 @@ svg{display:block;width:100%;height:auto;overflow:visible}
 .progress i{display:block;height:100%;background:var(--series-1);width:0;transition:width .25s}
 #log{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--ink-2);max-height:190px;overflow:auto;white-space:pre;line-height:1.6}
 
+/* ---- tabs ---- */
+.tabs{display:flex;gap:2px;margin-bottom:18px;border-bottom:1px solid var(--border)}
+.tabs button{border:0;border-radius:0;background:none;padding:9px 16px;color:var(--muted);border-bottom:2px solid transparent}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--series-1)}
+.tabs button:hover:not(:disabled){background:none;color:var(--ink)}
+
+/* ---- lead cards ---- */
+.lead{border:1px solid var(--border);border-radius:9px;padding:14px 16px;margin-bottom:10px;background:var(--surface-1)}
+.lead-head{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;justify-content:space-between;margin-bottom:9px}
+.lead-who b{font-size:15px;font-weight:700}
+.lead-who span{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.lead-right{display:flex;align-items:center;gap:9px;white-space:nowrap}
+.score{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.score small{font-size:11px;color:var(--muted);font-weight:400}
+.pill{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:5px}
+.r-sales_now{background:var(--good);color:#fff}
+.r-sdr_queue{background:var(--series-1);color:#fff}
+.r-nurture{background:var(--warning);color:#2a1f00}
+.r-hold{background:var(--cell-absent);color:var(--muted);border:1px solid var(--grid)}
+.r-disqualified{background:var(--critical);color:#fff}
+.r-needs_review{color:var(--muted);border:1px dashed var(--axis);
+  background:repeating-linear-gradient(45deg,transparent,transparent 4px,var(--grid) 4px,var(--grid) 6px)}
+.why{font-size:12.5px;color:var(--ink-2);border-left:2px solid var(--grid);padding-left:10px;margin:9px 0}
+.bd{display:flex;flex-wrap:wrap;gap:5px;margin:9px 0}
+.bd span{font-size:11.5px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;color:var(--ink-2)}
+.bd span b{color:var(--ink);font-variant-numeric:tabular-nums}
+.draft{background:var(--surface-2);border-radius:7px;padding:12px 14px;margin-top:10px;font-size:13.5px;white-space:pre-wrap;line-height:1.55;color:var(--ink)}
+.ev{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.ev span{font-size:11px;background:transparent;border:1px solid var(--good);color:var(--good);border-radius:4px;padding:2px 7px}
+.ev.none span{border-color:var(--critical);color:var(--critical)}
+
 .empty{text-align:center;color:var(--muted);padding:44px 0;font-size:14px}
 ol.recs{margin:0 0 0 20px;font-size:14px;color:var(--ink-2)}
 ol.recs li{margin-bottom:9px}
@@ -144,8 +175,13 @@ footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
   </div>
 </header>
 
+<nav class="tabs" id="tabs">
+  <button data-tab="aeo" class="on">Track C — AI visibility</button>
+  <button data-tab="leads">Track A — Inbound lead engine</button>
+</nav>
+
 <section id="runpanel">
-  <h2>Collecting</h2>
+  <h2>Running</h2>
   <div class="progress"><i id="pbar"></i></div>
   <div id="log"></div>
 </section>
@@ -383,9 +419,107 @@ function render(d, t) {
          It is shown, but it is not comparable with the latest runs.</div>` : "");
 }
 
+/* -------------------------------------------------- Track A — lead engine */
+
+const ROUTE_LABEL = {
+  sales_now: "Sales · 5 min", sdr_queue: "SDR queue · 24h", nurture: "Nurture",
+  hold: "Hold", disqualified: "Disqualified", needs_review: "Human review",
+};
+
+function leadTiles(s) {
+  return `<div class="tiles">
+    <div class="tile"><b>${s.total}</b><span>Leads processed</span>
+      <small>end to end: enrich → qualify → score → route → draft</small></div>
+    <div class="tile"><b>${s.routes.sales_now || 0}</b><span>Straight to sales</span>
+      <small>fit and intent both clear the bar — 5-minute SLA</small></div>
+    <div class="tile"><b>${s.disqualified}</b><span>Disqualified</span>
+      <small>checked before scoring, and absolute</small></div>
+    <div class="tile"><b>${s.needs_review}</b><span>Human review</span>
+      <small>couldn't be enriched — not the same as scoring badly</small></div>
+  </div>`;
+}
+
+function leadCard(l) {
+  const bd = (l.breakdown || []).map(r =>
+    `<span>${esc(r.factor)}: ${esc(r.detail)} <b>+${r.points}</b></span>`).join("");
+
+  const draft = l.message
+    ? `<div class="draft">${esc(l.message)}</div>
+       <div class="ev ${l.evidence && l.evidence.length ? "" : "none"}">
+         ${(l.evidence || []).map(e => `<span>${esc(e)}</span>`).join("")
+           || '<span>no specific fact cited — this is a mail-merge</span>'}
+       </div>`
+    : (l.error ? `<div class="why">${esc(l.error)}</div>` : "");
+
+  return `<div class="lead">
+    <div class="lead-head">
+      <div class="lead-who">
+        <b>${esc(l.name || l.email)}</b>
+        <span>${esc(l.title || "—")}${l.company ? " · " + esc(l.company) : ""}
+          ${l.headcount ? " · " + l.headcount.toLocaleString() + " staff" : ""} · ${esc(l.email)}</span>
+      </div>
+      <div class="lead-right">
+        ${l.score != null ? `<div class="score">${l.score} <small>pts · intent ${l.intent}</small></div>` : ""}
+        <span class="pill r-${esc(l.route)}">${esc(ROUTE_LABEL[l.route] || l.route)}</span>
+      </div>
+    </div>
+    ${bd ? `<div class="bd">${bd}</div>` : ""}
+    <div class="why">${esc(l.disqualified || l.route_why || "")}</div>
+    ${draft}
+  </div>`;
+}
+
+function renderLeads(d) {
+  const s = d.summary;
+  const genericWarn = s.generic_drafts
+    ? `<div class="note warn"><b>${s.generic_drafts} draft(s) cited no specific fact.</b>
+       That is a mail-merge with a name in it. The model is asked to declare which
+       record fields it leaned on, so this is checkable rather than assumed.</div>` : "";
+
+  $("#app").innerHTML =
+    leadTiles(s) +
+    `<section>
+      <h2>Every lead, and why it went where it went</h2>
+      <p class="sub">Enrichment, then disqualification, then scoring, then routing, then the
+        draft. <b>Rules decide and the model writes</b> — scoring is arithmetic over
+        <code>config/leads.yaml</code>, because a model asked to score a lead out of 100
+        returns a confident number it can't reproduce twice and nobody can audit. Every
+        point below shows where it came from.</p>
+      ${genericWarn}
+      ${d.leads.map(leadCard).join("")}
+    </section>
+    <section>
+      <h2>Three decisions worth arguing about</h2>
+      <div class="note"><b>Disqualifiers run before scoring, and they are absolute.</b>
+        A strong firmographic profile must never outvote "personal email, no company".
+        Scoring a disqualified lead and letting it win on points is the commonest way
+        one of these quietly poisons a pipeline.</div>
+      <div class="note"><b>Unenrichable is not low-scoring.</b> A lead we couldn't look up
+        goes to a human, not to the bottom of the list. "We don't know" and "we know it's
+        weak" are different states — and conflating them silently bins real buyers, because
+        nobody goes looking for the leads that never arrived.</div>
+      <div class="note warn"><b>Fit and intent are separate gates.</b> The first version routed
+        on the total alone and sent someone who registered for a webinar and never attended
+        straight to sales on a five-minute SLA, earned purely on headcount and job title.
+        A big company with the right title is not a buying signal.</div>
+    </section>`;
+}
+
 /* ------------------------------------------------------------------ load */
 
+let TAB = "aeo";
+
 async function load() {
+  if (TAB === "leads") {
+    const d = EMBED ? EMBED.leads : await api("/api/leads");
+    if (!d || d.empty) {
+      $("#app").innerHTML = '<div class="empty">No lead run yet. Press <b>Run lead engine</b>.</div>';
+      return;
+    }
+    renderLeads(d);
+    $("#runmeta").textContent = `lead run ${d.run.id} · ${d.run.started_at} · fit ${d.run.fit_hash}`;
+    return;
+  }
   const d = EMBED ? EMBED.report : await api("/api/report");
   if (!d || d.empty) {
     $("#app").innerHTML = '<div class="empty">No completed run in this export.</div>';
@@ -408,17 +542,32 @@ async function poll() {
   $("#log").scrollTop = 1e6;
   if (st.running) { setTimeout(poll, 600); return; }
   $("#btnrun").disabled = false;
-  $("#btnrun").textContent = "Run live collection";
+  $("#btnrun").textContent = runLabel();
   await load();
 }
+
+const runLabel = () => TAB === "leads" ? "Run lead engine" : "Run live collection";
+
+// Tabs work in the standalone export too, so a reviewer with no server can
+// still see both tracks.
+$("#tabs").onclick = async (e) => {
+  const b = e.target.closest("button[data-tab]");
+  if (!b || b.classList.contains("on")) return;
+  [...$("#tabs").children].forEach(x => x.classList.toggle("on", x === b));
+  TAB = b.dataset.tab;
+  const run = $("#btnrun");
+  if (run) run.textContent = runLabel();
+  $("#app").innerHTML = '<div class="empty">loading…</div>';
+  await load();
+};
 
 if (!EMBED) {
   $("#btnrun").onclick = async () => {
     $("#btnrun").disabled = true;
-    $("#btnrun").textContent = "Collecting…";
+    $("#btnrun").textContent = "Running…";
     $("#runpanel").classList.add("on");
     $("#log").textContent = "";
-    await api("/api/run", { method: "POST" });
+    await api(TAB === "leads" ? "/api/leads/run" : "/api/run", { method: "POST" });
     poll();
   };
   $("#btnexport").onclick = async () => {

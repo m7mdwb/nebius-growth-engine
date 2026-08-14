@@ -23,13 +23,31 @@ TEMPLATE = ROOT / "web" / "static" / "index.html"
 OUT = ROOT / "out"
 
 
+def _leads_payload() -> dict:
+    """Track A, so the export carries both tracks and the reviewer can switch."""
+    from . import leads as L
+    fit = L.load_fit()
+    with db.session() as conn:
+        lrid = db.latest_lead_run_id(conn)
+        if lrid is None:
+            return {"empty": True}
+        rows = db.leads(conn, lrid)
+        run = db.lead_run(conn, lrid)
+    for r in rows:
+        r["intent"] = L.intent_points(r["breakdown"])
+    return {"empty": False, "run": run, "leads": rows,
+            "summary": L.summarise(rows), "routing": fit.routing, "stale_fit": False}
+
+
 def build_payload() -> dict:
     cfg = config.load()
+    leads_payload = _leads_payload()
     with db.session() as conn:
         rid = db.latest_run_id(conn)
         runs = db.runs(conn)
         if rid is None:
-            return {"report": {"empty": True}, "trend": [], "config": {}}
+            return {"report": {"empty": True}, "trend": [], "config": {},
+                    "leads": leads_payload}
 
         run = next((r for r in runs if r["id"] == rid), None)
         obs = db.observations(conn, rid)
@@ -69,6 +87,7 @@ def build_payload() -> dict:
     ]
 
     return {
+        "leads": leads_payload,
         "report": {
             "empty": False,
             "run": run,

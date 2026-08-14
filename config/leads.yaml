@@ -1,0 +1,129 @@
+# Track A — the fit definition.
+#
+# This file IS the qualification policy. Same principle as the AEO query set:
+# what counts as a good lead is config with a diff and a version, not a rule
+# buried in code that nobody can review. Sales should be able to read this file
+# and argue with it, because they are the ones who feel it when it's wrong.
+#
+# 🔑 The scoring below is ARITHMETIC, and arithmetic does not belong in a prompt.
+# An LLM asked to "score this lead out of 100" will produce a confident number
+# it cannot reproduce twice. Rules decide; the model only writes the message.
+
+icp:
+  # Who Nebius Academy's enterprise learning platform is actually for.
+  headcount:
+    # Below the floor there is no L&D function to sell a platform to.
+    floor: 200
+    bands:
+      - {min: 200,  max: 999,   points: 10}
+      - {min: 1000, max: 4999,  points: 20}
+      - {min: 5000, max: 999999, points: 25}
+
+  seniority:
+    # Buying committee for L&D platform: HR/People leadership plus a technical
+    # sponsor. An individual contributor is a signal, not a buyer.
+    - {match: [chro, "chief people", "chief learning", cto, "chief technology"], points: 25, label: exec}
+    - {match: [vp, "head of", director], points: 20, label: leader}
+    - {match: [manager, lead], points: 10, label: manager}
+    - {match: [specialist, coordinator, analyst, associate], points: 3, label: ic}
+
+  function:
+    - {match: ["l&d", "learning", "talent", "people", "hr", "human resources"], points: 20, label: L&D / People}
+    - {match: ["engineering", "data", "technology", "digital", "transformation"], points: 15, label: Technical}
+    - {match: ["operations", "strategy"], points: 8, label: Adjacent}
+
+  industry:
+    - {match: [financial, banking, insurance, fintech], points: 15}
+    - {match: [technology, software, saas, telecom], points: 15}
+    - {match: [pharma, healthcare, manufacturing, energy, logistics], points: 12}
+    - {match: [consulting, professional services], points: 8}
+
+  intent:
+    # What they did, not who they are. Behaviour outranks firmographics late in
+    # the funnel and this is where most scoring models under-weight.
+    - {signal: completed_assessment, points: 25}
+    - {signal: booked_demo, points: 30}
+    - {signal: pricing_page, points: 15}
+    - {signal: webinar_attended, points: 12}
+    - {signal: webinar_registered, points: 6}
+    - {signal: content_download, points: 5}
+
+# Disqualifiers are absolute and are checked BEFORE scoring. A disqualified lead
+# is not a low score — it is not a lead. Letting a strong firmographic profile
+# outvote "student, personal email" is how a scoring model quietly poisons a
+# pipeline, and it is the most common way these systems fail in production.
+disqualifiers:
+  free_email_domains: [gmail.com, yahoo.com, hotmail.com, outlook.com, icloud.com, proton.me]
+  blocked_roles: [student, intern, "job seeker", unemployed, "looking for"]
+  blocked_industries: [education]     # we sell TO enterprises, not to competitors
+  min_headcount: 50
+
+routing:
+  # Thresholds are stated once, here, so a change is one line and is reviewable.
+  #
+  # ⚠️ `min_intent` is a SECOND gate, and it exists because of a real bug. Routing
+  # on the total alone sent a lead who registered for a webinar and never
+  # attended straight to sales on a five-minute SLA — earned entirely on
+  # headcount, seniority and industry. Firmographics are not a buying signal.
+  # Fit says "worth talking to"; intent says "now". Both, or it isn't now.
+  - {min_score: 70, min_intent: 25, route: sales_now,  sla_minutes: 5,
+     why: "Fit AND intent both clear the bar. Speed-to-lead is the single biggest lever on conversion; five minutes is the mandate, not an aspiration."}
+  - {min_score: 45, route: sdr_queue,  sla_minutes: 1440,
+     why: "Real fit, weaker intent. Worth a human touch inside a day, not inside five minutes."}
+  - {min_score: 20, route: nurture,    sla_minutes: null,
+     why: "Plausible fit, no buying signal yet. Automated nurture until behaviour changes."}
+  - {min_score: 0,  route: hold,       sla_minutes: null,
+     why: "Insufficient fit. Held rather than deleted so the definition can be re-tested against it later."}
+
+drafting:
+  model: claude-opus-5
+  max_tokens: 900
+  # The model must declare which enrichment facts it used. That turns
+  # "personalised" from a claim into something you can audit in one glance —
+  # and a draft that cites no facts is a mail-merge wearing a costume.
+  require_evidence: true
+
+# Five sample leads. Deliberately not five good ones: a clean exec, a strong
+# firmographic profile with no intent, a disqualified free-email student, a
+# mid-market manager, and one that CANNOT be enriched. The last is the one that
+# matters — see leads.py.
+samples:
+  - email: k.andersen@meridianbank.com
+    first_name: Karin
+    last_name: Andersen
+    company: Meridian Bank
+    source: completed_assessment
+    signals: [completed_assessment, pricing_page]
+    note: "Assessment score: 2.1/5 on AI readiness, 8,000 employees"
+
+  - email: t.okafor@helioxenergy.com
+    first_name: Tunde
+    last_name: Okafor
+    company: Heliox Energy
+    source: webinar
+    signals: [webinar_registered]
+    note: "Registered, did not attend"
+
+  - email: sam.parker92@gmail.com
+    first_name: Sam
+    last_name: Parker
+    company: ""
+    source: content_download
+    signals: [content_download]
+    note: "Downloaded the AI readiness guide"
+
+  - email: p.novak@kestrel-logistics.com
+    first_name: Petra
+    last_name: Novak
+    company: Kestrel Logistics
+    source: completed_assessment
+    signals: [completed_assessment, webinar_attended]
+    note: "Assessment score: 1.4/5, flagged 'no internal training capability'"
+
+  - email: r.delacroix@voltaire-partners.fr
+    first_name: Renaud
+    last_name: Delacroix
+    company: Voltaire Partners
+    source: completed_assessment
+    signals: [completed_assessment, booked_demo]
+    note: "Enrichment provider returns nothing for this domain"
