@@ -153,6 +153,21 @@ svg{display:block;width:100%;height:auto;overflow:visible}
 .ev span{font-size:11px;background:transparent;border:1px solid var(--good);color:var(--good);border-radius:4px;padding:2px 7px}
 .ev.none span{border-color:var(--critical);color:var(--critical)}
 
+/* ---- method tables ---- */
+.mt{width:100%;border-collapse:collapse;border-spacing:0;font-size:13px;min-width:0}
+.mt th{text-align:left;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+  padding:0 12px 7px 0;border-bottom:1px solid var(--border);white-space:nowrap}
+.mt td{padding:9px 12px 9px 0;border-bottom:1px solid var(--grid);vertical-align:top;color:var(--ink-2)}
+.mt td:first-child{color:var(--ink);font-weight:600;white-space:nowrap}
+.mt tr:last-child td{border-bottom:0}
+.mt .pts{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600;text-align:right;white-space:nowrap}
+.mtwrap{overflow-x:auto}
+.grp{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);margin:18px 0 5px}
+.grp:first-child{margin-top:0}
+.grpwhy{font-size:12.5px;color:var(--ink-2);margin-bottom:9px;max-width:78ch}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;background:var(--surface-2);
+  border:1px solid var(--border);border-radius:4px;padding:1px 5px}
+
 .empty{text-align:center;color:var(--muted);padding:44px 0;font-size:14px}
 ol.recs{margin:0 0 0 20px;font-size:14px;color:var(--ink-2)}
 ol.recs li{margin-bottom:9px}
@@ -469,6 +484,97 @@ function leadCard(l) {
   </div>`;
 }
 
+function scoringMethod(m) {
+  const icp = m.icp || {};
+  const rows = (list, fmt) => list.map(r =>
+    `<tr><td>${esc(fmt(r).what)}</td><td>${esc(fmt(r).detail)}</td><td class="pts">+${r.points}</td></tr>`).join("");
+
+  const hc = `<div class="grp">Company size</div>
+    <div class="grpwhy">${esc(icp.headcount.why || "")}</div>
+    <div class="mtwrap"><table class="mt">
+      <thead><tr><th>Band</th><th>Meaning</th><th class="pts">Points</th></tr></thead>
+      <tbody>${icp.headcount.bands.map(b => `<tr>
+        <td>${b.min.toLocaleString()}–${b.max > 99999 ? "∞" : b.max.toLocaleString()}</td>
+        <td>${b.min >= 5000 ? "Enterprise L&amp;D function with its own budget"
+             : b.min >= 1000 ? "Dedicated L&amp;D team, platform decision is real"
+             : "Has an L&amp;D owner, may not have a platform budget yet"}</td>
+        <td class="pts">+${b.points}</td></tr>`).join("")}</tbody></table></div>
+    <div class="grpwhy">Below ${icp.headcount.floor} staff there is no L&amp;D function to sell a platform to,
+      so it is a disqualifier rather than a low score.</div>`;
+
+  const sen = `<div class="grp">Seniority</div>
+    <div class="grpwhy">Derived from the job title by these rules — never taken from a provider's own
+      "seniority" field. Every vendor uses a different taxonomy, so importing theirs means our score
+      silently changes meaning the day we switch vendor. The title is the raw fact; the tier is our judgement.</div>
+    <div class="mtwrap"><table class="mt">
+      <thead><tr><th>Tier</th><th>Matches on</th><th class="pts">Points</th></tr></thead>
+      <tbody>${rows(icp.seniority, r => ({what: r.label, detail: r.match.join(", ")}))}</tbody></table></div>`;
+
+  const fn = `<div class="grp">Function &amp; industry</div>
+    <div class="grpwhy">Function decides whether they sit on the buying committee at all. Industry is a
+      weaker signal and is weighted accordingly — it moves a lead between queues, never into one.</div>
+    <div class="mtwrap"><table class="mt">
+      <tbody>${rows(icp.function, r => ({what: r.label, detail: r.match.join(", ")}))}
+             ${rows(icp.industry, r => ({what: "Industry", detail: r.match.join(", ")}))}</tbody></table></div>`;
+
+  const intent = `<div class="grp">Intent — what they did</div>
+    <div class="grpwhy"><b>First-party data, and it is both the most reliable input we have and the
+      cheapest.</b> Third-party firmographics are bought, stale and inconsistent between vendors;
+      behavioural signals come from our own systems, are current to the minute, and cost nothing.
+      Most scoring models weight them too low because firmographics are easier to buy than behaviour
+      is to instrument — a statement about procurement, not about predictiveness.</div>
+    <div class="mtwrap"><table class="mt">
+      <tbody>${rows(icp.intent, r => ({what: r.signal.replace(/_/g, " "),
+        detail: r.points >= 25 ? "Strong buying signal — clears the intent gate on its own"
+              : r.points >= 12 ? "Real engagement, not enough alone"
+              : "Weak signal; counts, but will not open the sales lane"}))}</tbody></table></div>`;
+
+  const routes = `<div class="grp">Routing</div>
+    <div class="grpwhy">Two gates, not one. Fit says "worth talking to"; intent says "now".</div>
+    <div class="mtwrap"><table class="mt">
+      <thead><tr><th>Route</th><th>Requires</th><th>SLA</th></tr></thead>
+      <tbody>${(m.routing || []).map(r => `<tr>
+        <td>${esc(ROUTE_LABEL[r.route] || r.route)}</td>
+        <td>${r.min_score}+ points${r.min_intent ? ` <b>and</b> ${r.min_intent}+ intent` : ""}
+          <br><span style="color:var(--muted)">${esc(r.why || "")}</span></td>
+        <td>${r.sla_minutes ? (r.sla_minutes >= 60 ? Math.round(r.sla_minutes / 60) + "h" : r.sla_minutes + " min") : "—"}</td>
+      </tr>`).join("")}</tbody></table></div>`;
+
+  return `<section>
+    <h2>Why the scoring is what it is</h2>
+    <p class="sub">Every weight below is read live from <code>config/leads.yaml</code>, so this
+      explanation cannot drift from the rules it is explaining — the commonest way a scoring model
+      ends up documented as something it no longer is. Sales should be able to read that file and
+      argue with it; they are the ones who feel it when it is wrong.</p>
+    ${hc}${sen}${fn}${intent}${routes}
+  </section>`;
+}
+
+function enrichmentMethod(m) {
+  const e = m.enrichment || {};
+  return `<section>
+    <h2>Enrichment — mocked here, this in production</h2>
+    <p class="sub">${esc(e.strategy || "")}</p>
+    <div class="grp">The waterfall, cheapest first</div>
+    <div class="mtwrap"><table class="mt">
+      <thead><tr><th>Step</th><th>Gives</th><th>Cost</th><th>Why it sits here</th></tr></thead>
+      <tbody>${(e.waterfall || []).map(w => `<tr>
+        <td>${esc(w.provider)}</td><td>${esc(w.gives)}</td>
+        <td style="white-space:nowrap">${esc(w.cost)}</td><td>${esc(w.why)}</td></tr>`).join("")}
+      </tbody></table></div>
+
+    <div class="grp">What we need, and how we know it is not wrong</div>
+    <div class="grpwhy">A field nobody verifies is a field that will eventually be wrong without
+      anyone noticing. Each row names the check and what breaks if it fails.</div>
+    <div class="mtwrap"><table class="mt">
+      <thead><tr><th>Field</th><th>Source</th><th>Verification</th><th>Risk if wrong</th></tr></thead>
+      <tbody>${(e.fields || []).map(f => `<tr>
+        <td>${esc(f.field)}</td><td>${esc(f.source)}</td>
+        <td>${esc(f.verify)}</td><td>${esc(f.risk)}</td></tr>`).join("")}
+      </tbody></table></div>
+  </section>`;
+}
+
 function renderLeads(d) {
   const s = d.summary;
   const genericWarn = s.generic_drafts
@@ -487,8 +593,9 @@ function renderLeads(d) {
         point below shows where it came from.</p>
       ${genericWarn}
       ${d.leads.map(leadCard).join("")}
-    </section>
-    <section>
+    </section>` +
+    (d.method ? scoringMethod(d.method) + enrichmentMethod(d.method) : "") +
+    `<section>
       <h2>Three decisions worth arguing about</h2>
       <div class="note"><b>Disqualifiers run before scoring, and they are absolute.</b>
         A strong firmographic profile must never outvote "personal email, no company".

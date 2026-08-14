@@ -68,6 +68,20 @@ class FitDefinition:
     def samples(self) -> list[dict]: return self.raw.get("samples", [])
 
     @property
+    def enrichment(self) -> dict: return self.raw.get("enrichment", {})
+
+    def method(self) -> dict:
+        """Everything needed to explain the design, straight from the config.
+
+        Rendered in the UI rather than written up separately, so the explanation
+        cannot drift from the rules it is explaining — the commonest way a scoring
+        model ends up documented as something it no longer is.
+        """
+        return {"icp": self.icp, "disqualifiers": self.disq,
+                "routing": self.routing, "enrichment": self.enrichment,
+                "fit_hash": self.fit_hash}
+
+    @property
     def fit_hash(self) -> str:
         """Fingerprint of the qualification policy.
 

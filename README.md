@@ -122,6 +122,35 @@ matters more here, because nobody goes looking for the leads that never arrived.
 **The draft must cite its evidence.** The model returns which record fields it used. A
 draft citing nothing is a mail-merge in costume, and the dashboard counts those.
 
+### Enrichment: mocked here, and this is the production plan
+
+**Waterfall, cheapest source first, stop at the first match.** No single B2B provider
+exceeds roughly **70% match rate** on a real inbound list; chaining three to five lifts
+it to **85–95%**. That gap is the whole argument — a single provider means one lead in
+three arrives blank, and if blanks score as zeroes you are systematically binning a
+third of your inbound. It is also why `needs_review` exists: at 85–95%, about one lead
+in ten still won't resolve, and that one needs a human, not a low number.
+
+| Step | Gives | Cost | Why it sits there |
+|---|---|---|---|
+| First-party form | email, company as typed, self-declared role, assessment answers | free | Ours, and more current than anything purchasable |
+| Domain heuristics | domain, free-provider detection, MX validity | free | Catches disqualifiers before spending a credit |
+| Apollo.io | firmographics, headcount, industry, title | free tier → ~$49/user/mo | Widest cheap coverage, strongest in North America |
+| Cognism | EU firmographics, phone-verified contacts, consent/DNC | enterprise | The EU step, and not optional — see below |
+| Clay | orchestration across 100+ sources | from ~$185/mo | Replaces a hand-built chain past ~3 providers |
+
+**Cognism is in there for a specific reason.** Nebius Academy is expanding into Europe,
+where enrichment and outbound sit under GDPR legitimate interest. Cognism ships DNC
+screening and lawful-basis documentation rather than leaving you to argue it afterwards.
+US-centric providers have both thinner EU coverage and thinner compliance posture.
+
+**Fields, and how each is verified**, are in `config/leads.yaml` and rendered on the
+dashboard. Two rules drive the list: headcount is **banded, never exact**, because
+providers disagree by 2–3× and an exact figure makes the score move when the vendor
+updates rather than when the company does; and seniority is **derived from the title by
+our own rules**, never imported from a vendor's seniority field, because every taxonomy
+differs and importing one couples our score to their definitions.
+
 ### Two bugs the sample set caught
 
 **`intern` matched inside "no INTERNal training capability"** and disqualified a real

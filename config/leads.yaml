@@ -12,7 +12,12 @@
 icp:
   # Who Nebius Academy's enterprise learning platform is actually for.
   headcount:
-    # Below the floor there is no L&D function to sell a platform to.
+    why: >
+      Banded, never an exact number. Enrichment providers disagree on headcount by
+      2-3x for the same company — one counts the legal entity, another the group,
+      a third whatever LinkedIn says. Scoring on an exact figure means the score
+      moves when the vendor updates, not when the company does. Bands absorb that.
+      Below the floor there is no L&D function to sell a platform to at all.
     floor: 200
     bands:
       - {min: 200,  max: 999,   points: 10}
@@ -20,8 +25,13 @@ icp:
       - {min: 5000, max: 999999, points: 25}
 
   seniority:
-    # Buying committee for L&D platform: HR/People leadership plus a technical
+    # Buying committee for an L&D platform: HR/People leadership plus a technical
     # sponsor. An individual contributor is a signal, not a buyer.
+    #
+    # ⚠️ Seniority is DERIVED from the job title by the rules below — never taken
+    # from a provider's own "seniority" field. Every vendor uses a different
+    # taxonomy, so importing theirs means our score silently changes meaning the
+    # day we switch vendor. The title is the raw fact; the tier is our judgement.
     - {match: [chro, "chief people", "chief learning", cto, "chief technology"], points: 25, label: exec}
     - {match: [vp, "head of", director], points: 20, label: leader}
     - {match: [manager, lead], points: 10, label: manager}
@@ -39,8 +49,14 @@ icp:
     - {match: [consulting, professional services], points: 8}
 
   intent:
-    # What they did, not who they are. Behaviour outranks firmographics late in
-    # the funnel and this is where most scoring models under-weight.
+    # What they DID, not who they are.
+    #
+    # 🔑 This is first-party data, and it is both the most reliable input we have
+    # and the cheapest. Third-party firmographics are bought, stale, and
+    # inconsistent between vendors; behavioural signals come from our own systems,
+    # are current to the minute, and cost nothing. Most scoring models weight them
+    # far too low because firmographics are easier to buy than behaviour is to
+    # instrument — which is a statement about procurement, not about predictiveness.
     - {signal: completed_assessment, points: 25}
     - {signal: booked_demo, points: 30}
     - {signal: pricing_page, points: 15}
@@ -74,6 +90,79 @@ routing:
      why: "Plausible fit, no buying signal yet. Automated nurture until behaviour changes."}
   - {min_score: 0,  route: hold,       sla_minutes: null,
      why: "Insufficient fit. Held rather than deleted so the definition can be re-tested against it later."}
+
+# --------------------------------------------------------------------------
+# Enrichment: mocked in this prototype, and this is the production plan.
+# --------------------------------------------------------------------------
+enrichment:
+  strategy: >
+    Waterfall, cheapest source first, stop at the first match. No single B2B
+    provider exceeds roughly 70% match rate on a real inbound list; chaining
+    three to five lifts it to 85-95%. That gap is the whole argument: a single
+    provider means one lead in three arrives as a blank, and if blanks are scored
+    as zeroes you are systematically binning a third of your inbound.
+    It is also why `needs_review` exists as a route — at 85-95%, roughly one lead
+    in ten still won't resolve, and that one needs a human, not a low number.
+
+  # Ordered. Each entry only gets called if everything above it missed.
+  waterfall:
+    - provider: First-party form
+      gives: name, work email, company as typed, self-declared role, assessment answers
+      cost: free
+      why: >
+        Already ours and more current than anything purchasable. Self-reported job
+        title beats a third-party title that may be two promotions out of date.
+    - provider: Domain heuristics
+      gives: company domain, free-provider detection, MX validity
+      cost: free
+      why: Derived from the email. Catches the disqualifiers before spending a credit.
+    - provider: Apollo.io
+      gives: firmographics, headcount, industry, title
+      cost: free tier, then ~$49/user/mo
+      why: Widest cheap coverage; the right first paid step, strongest in North America.
+    - provider: Cognism
+      gives: EU firmographics, phone-verified contacts, consent/DNC status
+      cost: enterprise
+      why: >
+        The EU-specific step, and not optional here. Nebius Academy is expanding
+        into Europe, where enrichment and outbound sit under GDPR legitimate
+        interest — Cognism ships DNC screening and lawful-basis documentation
+        rather than leaving you to argue it after the fact. US-centric providers
+        have both thinner EU coverage and thinner compliance posture.
+    - provider: Clay
+      gives: orchestration across 100+ sources
+      cost: from ~$185/mo
+      why: >
+        Replaces the hand-built waterfall once there are more than about three
+        providers. Worth it when the blended cost per matched record drops below
+        the engineering time spent maintaining the chain — not before.
+
+  # What we need, where it comes from, and how we know it is not wrong.
+  fields:
+    - {field: company_domain, source: derived from email,
+       verify: "not a free-mail provider; MX record resolves",
+       risk: "wrong domain means every downstream fact belongs to another company"}
+    - {field: company_name, source: enrichment,
+       verify: "must reconcile with the domain's registrant",
+       risk: "subsidiary vs group confusion mis-sizes the account"}
+    - {field: headcount, source: enrichment,
+       verify: "banded, never exact; providers disagree 2-3x",
+       risk: "an exact figure makes the score move when the vendor updates"}
+    - {field: industry, source: enrichment,
+       verify: "normalised to our own list, not the vendor taxonomy",
+       risk: "vendor taxonomies differ, so the same company scores differently per source"}
+    - {field: job_title, source: "form first, enrichment second",
+       verify: "prefer self-reported; third-party titles go stale within months",
+       risk: "a stale title mis-reads the buying role entirely"}
+    - {field: seniority + function, source: "DERIVED by our rules from the title",
+       verify: "deterministic and versioned in this file",
+       risk: "importing a vendor's seniority field couples our score to their taxonomy"}
+    - {field: intent signals, source: "first-party, our own systems",
+       verify: "timestamped events, no third party involved",
+       risk: "the most predictive input; under-weighting it is the commonest scoring error"}
+    - {field: email deliverability, source: verification provider,
+       verify: "syntax, MX, catch-all detection before any send",
+       risk: "bounces damage sender reputation for every later campaign"}
 
 drafting:
   model: claude-opus-5

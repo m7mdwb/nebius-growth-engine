@@ -36,7 +36,8 @@ def _leads_payload() -> dict:
     for r in rows:
         r["intent"] = L.intent_points(r["breakdown"])
     return {"empty": False, "run": run, "leads": rows,
-            "summary": L.summarise(rows), "routing": fit.routing, "stale_fit": False}
+            "summary": L.summarise(rows), "routing": fit.routing,
+            "method": fit.method(), "stale_fit": False}
 
 
 def build_payload() -> dict:

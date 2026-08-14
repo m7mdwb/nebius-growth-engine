@@ -215,6 +215,7 @@ def api_leads() -> JSONResponse:
         "leads": rows,
         "summary": L.summarise(rows),
         "routing": fit.routing,
+        "method": fit.method(),
         "stale_fit": bool(run and run.get("fit_hash") and run["fit_hash"] != fit.fit_hash),
     })
 
