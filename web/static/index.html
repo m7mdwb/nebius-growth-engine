@@ -324,6 +324,17 @@ footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
 .fexit.t-hot{border-color:#15803d;border-style:solid}
 .fexit.t-warm{border-color:#a1620788}
 .froutes{margin-bottom:6px}
+
+/* A seam node and a seam branch use the SAME hatch as an unmeasured grid cell.
+   Not a new visual language: on this page hatching has meant "nobody looked"
+   since the first screen, and Track C's whole argument is that it must never
+   look like a measured zero. */
+.fstage.k-seam{border-left-color:var(--axis);border-left-style:dashed;
+  background:repeating-linear-gradient(45deg,transparent,transparent 6px,var(--grid) 6px,var(--grid) 7px)}
+.fexit.t-seam{border-color:var(--axis);
+  background:repeating-linear-gradient(45deg,transparent,transparent 5px,var(--grid) 5px,var(--grid) 6px)}
+.lg.k-seam::before{background:none;height:0;border-radius:0;border-top:3px dashed var(--axis)}
+.fstate{font-variant-numeric:tabular-nums}
 @media(max-width:640px){
   .fexit{margin-left:12px;flex-wrap:wrap}
   .fnote{max-width:none}
@@ -358,6 +369,7 @@ footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
   <button data-tab="leads" class="on">Track A — Inbound lead engine</button>
   <button data-tab="flow">Track A · Logic</button>
   <button data-tab="aeo">Track C — AI visibility</button>
+  <button data-tab="cflow">Track C · Logic</button>
 </nav>
 
 <section id="runpanel">
@@ -1118,6 +1130,182 @@ function flowChart(d) {
   </section>`;
 }
 
+/* ------------------------------------- Track C · Logic — the live flowchart */
+
+/* Same contract as Track A's chart: every node carries the count from the last
+   real run, so the diagram cannot drift away from the code it describes.
+   Track C's argument is narrower and sharper, and the layout is built around
+   it — there are TWO ways a cell ends up without a reading, and they leave the
+   spine at different points:
+
+     · a DECLARED SEAM leaves at the engine stage. No key, so no call was made.
+     · DEAD AIR leaves after the call — an error, a refusal, an empty answer.
+
+   Both are stored `unmeasured`; neither is ever `absent`. Merging them here
+   would undo the thing the tab exists to show, so the chart keeps them apart
+   even when one of them is zero — which, on a healthy run, it is. */
+function flowChartC(d) {
+  const grid = d.grid || [];
+  const queries = d.queries || [];
+  const bench = d.benchmark || {};
+  const gap = d.source_gap || {};
+  const seo = d.seo || {};
+  const v = (d.summary && d.summary.variance) || {};
+
+  /* One entry per repeat, flattened out of the grid: this counts READINGS,
+     not cells. 12 queries x 4 engines is 48 cells and 80 readings. */
+  const st = { cited: 0, mentioned: 0, absent: 0, unmeasured: 0 };
+  grid.forEach(c => (c.statuses || []).forEach(s => { st[s] = (st[s] || 0) + 1; }));
+  const totalObs = Object.values(st).reduce((a, b) => a + b, 0);
+
+  const engines = (d.engines || []).map(e => {
+    const cells = grid.filter(c => c.engine === e.key);
+    return {
+      key: e.key, label: e.label,
+      live: cells.some(c => c.live),
+      obs: cells.reduce((n, c) => n + (c.statuses || []).length, 0),
+      note: (cells.find(c => c.note) || {}).note,
+    };
+  });
+  const seams = engines.filter(e => !e.live && e.obs);
+  const live = engines.filter(e => e.live);
+  const seamObs = seams.reduce((n, e) => n + e.obs, 0);
+  const liveObs = totalObs - seamObs;
+  // Asked, and nothing usable came back. Derived rather than assumed: whatever
+  // is unmeasured and did NOT come from a keyless engine was a real failed call.
+  const deadAir = st.unmeasured - seamObs;
+
+  const controls = queries.filter(q => q.benchmark === false);
+  const controlWon = controls.filter(q => grid.some(c =>
+    c.query_id === q.id && c.live &&
+    (c.statuses || []).some(s => s === "cited" || s === "mentioned"))).length;
+
+  // Were the only citations on the CONTROLS? If so the benchmark reading of
+  // 0 of 10 deserves the sentence, because "we were cited twice" and "we won
+  // nothing a buyer would type" are both true and only one of them matters.
+  const benchIds = new Set(queries.filter(q => q.benchmark !== false).map(q => q.id));
+  const benchCited = grid.filter(c => benchIds.has(c.query_id))
+    .reduce((n, c) => n + (c.statuses || []).filter(s => s === "cited").length, 0);
+
+  const classified = (gap.kinds || []).reduce((n, k) => n + k.citations, 0);
+  const maxRepeats = grid.reduce((m, c) => Math.max(m, (c.statuses || []).length), 0);
+  const cost = d.cost || {};
+  const hash = (d.run || {}).query_set_hash;
+
+  const stage = (num, kind, title, sub, count, note) => `
+    <div class="fstage k-${kind}">
+      <div class="fnum">${num}</div>
+      <div class="fbody">
+        <div class="fhead"><b>${title}</b>
+          ${count != null ? `<span class="fcount fstate">${count}</span>` : ""}</div>
+        <div class="fsub">${sub}</div>
+        ${note ? `<div class="fnote">${note}</div>` : ""}
+      </div>
+    </div>`;
+
+  const exit = (label, count, why, tone) => `
+    <div class="fexit t-${tone || ""}">
+      <span class="farrow">└─▶</span>
+      <span class="fexit-l">${esc(label)}</span>
+      <span class="fcount fstate">${count}</span>
+      <span class="fexit-w">${why}</span>
+    </div>`;
+
+  return `<section>
+    <h2>How a query becomes a benchmark</h2>
+    <p class="sub">The Track C pipeline, with the counts from the last collection on every
+      node — not an illustration of it. <b>Read the left edge:</b> the colour is what
+      <i>kind</i> of step it is. The two hatched paths are the ones this track exists to
+      keep apart: <b>a declared seam never made the call</b>, and <b>dead air made it and
+      got nothing back</b>. Neither is ever written down as <i>absent</i>, because absence
+      is a finding and these are the lack of one.</p>
+
+    <div class="flegend">
+      <span class="lg k-free">config — free</span>
+      <span class="lg k-paid">paid call</span>
+      <span class="lg k-seam">declared seam — never asked</span>
+      <span class="lg k-rules">rules — deterministic</span>
+      <span class="lg k-model">model</span>
+    </div>
+
+    <div class="flow">
+      ${stage(1, "free", "The measurement contract",
+        `<code>config/queries.yaml</code> — ${bench.out_of || 0} buyer-intent queries and
+         ${controls.length} branded controls, hashed together${hash ? ` as <code>${esc(hash)}</code>` : ""}.`,
+        queries.length,
+        "The hash is stored on the run. Edit a query and the hash changes, which <b>breaks the trend line on purpose</b> — a chart that keeps drawing through a changed question set is comparing two different measurements and saying nothing.")}
+      ${exit("Branded controls — asked, never counted", controls.length,
+        `won ${controlWon} of ${controls.length}; a sanity check, not the score`, "ctl")}
+
+      ${stage(2, "paid", "Ask each engine",
+        `Live now: ${live.map(e => esc(e.label)).join(" · ") || "none"}. One adapter per surface, all returning the same shape.`,
+        `${live.length} of ${engines.length}`,
+        `Claude answers with the <code>web_search</code> tool; AI Overviews comes through Apify.
+         ${cost.calls ? `This run: <b>$${cost.usd.toFixed(4)}</b> over ${cost.calls} calls and ${cost.searches} searches, read from <code>response.usage</code>.`
+                      : "This run predates the usage instrumentation, so it reports no cost rather than a $0.00 that would read as free."}`)}
+      ${seams.map(e => exit(`${e.label} — no key, declared seam`, e.obs,
+        "never called; stored is_live=0", "seam")).join("")}
+
+      ${stage(3, "paid", "Repeat, because one sample is not a measurement",
+        `Up to ${maxRepeats} readings of the same query on the same engine, on a subset — the rest run once, to keep a demo run affordable.`,
+        totalObs,
+        `${v.repeated_cells || 0} cells were read more than once and <b>${v.unstable_cells || 0} of them disagreed with themselves</b>. That spread is the noise floor: movement smaller than it is not a result, and a tool that collected one sample per cell could not know that.`)}
+
+      ${stage(4, "rules", "Classify each answer",
+        "Word-boundary match on the brand and its aliases, then on the cited domains. <i>Cited</i> outranks <i>mentioned</i>; a bare “Nebius” only counts with training context around it, because the parent company is an AI-infrastructure business.",
+        liveObs,
+        "The classification is a lookup over the answer text — no model is asked whether we appeared, because an instrument that re-decides its own definition between runs cannot measure change.")}
+      <div class="froutes">
+        ${exit("Cited — the answer carried a link", st.cited, "the strongest form of presence", "hot")}
+        ${exit("Mentioned — named, no link", st.mentioned, "recall without traffic; a different fix", "warm")}
+        ${exit("Absent — we asked, we were not there", st.absent, "a measurement, and the finding", "")}
+        ${exit("Dead air — asked, nothing came back", Math.max(deadAir, 0),
+          "error, refusal or an empty answer — unmeasured, never absent", "seam")}
+      </div>
+
+      ${stage(5, "rules", "The benchmark — a count, never a percentage",
+        `Won = any engine, on any repeat, cited <i>or</i> mentioned. Deliberately generous: the headline asks “did we show up at all”, and the cited/mentioned split is carried in the rows above where it can be acted on.`,
+        `${bench.appear_in} of ${bench.out_of}`,
+        `A percentage hides its denominator, and the denominator is where these dashboards lie — 30% reads identically whether it is 3 of 10 measured or 3 of 10 with four cells never looked at.
+         ${st.cited && !benchCited ? `<b>Every citation in this run landed on a branded control.</b> We are cited when someone types our name and absent from all ${bench.out_of} questions a buyer types instead — which is the whole reason the controls are not in the count.` : ""}`)}
+      ${exit("Not measured — held out of the denominator", (bench.unmeasured || []).length,
+        "named on the page, not folded in: “3 of 10” and “3 of 8” are different claims", "seam")}
+
+      ${stage(6, "rules", "The source gap — what won instead",
+        `For every query we lost, classify each cited domain by <b>what kind of thing it is</b>: review platform, competitor-owned, analyst, community, editorial.`,
+        gap.lost_queries || 0,
+        `<b>${classified}</b> citations classified on the lost queries.
+         ${(gap.kinds || []).length ? `<div style="margin:5px 0">${gap.kinds.map(k => `${esc(k.label)} <b>${k.citations}</b>`).join(" &nbsp;·&nbsp; ")}</div>` : ""}
+         <b>A lookup, not a model call</b>, for the same reason as the scoring in Track A: a source type that changed its mind between runs would make every recommendation unreproducible. This is the step that turns a scoreboard into a list of places to go and get placed.`)}
+
+      ${stage(7, "rules", "Does SEO feed AEO?",
+        "Of the domains the AI answer cited, how many were also ranking organically for the same query — captured from the same response, not a second search.",
+        seo.queries_compared || 0,
+        seo.queries_compared
+          ? `${seo.also_ranking_organically} of ${seo.cited_domains} cited domains were also in the organic results.
+             ${seo.verdict ? `<b>${esc(seo.verdict)}</b>` : "<b>Too few queries to call it</b>, and reported with the sample size attached rather than as a figure that would be read as settled."}`
+          : "Only Google AI Overviews exposes both the generative answer and the SERP beneath it, so this is measurable on that engine alone — and unmeasurable on this run rather than assumed.")}
+
+      ${stage(8, "model", "Recommendations — the one thing rules cannot do",
+        "3–5 concrete moves, written from the benchmark, the source gap and the overlap figure.",
+        null,
+        "The <b>only</b> model call in the analysis path, and it never sees the raw answers — it is handed the evidence tables above and nothing else. A model given raw answers returns five bullets that would be identical for any company in any category; a model given a table it cannot argue with has to name specific domains. Generated on demand from the Track C tab: one Opus call, about $0.15.")}
+    </div>
+
+    <div class="note"><b>Only the last step is a model.</b> Everything above it is a
+      lookup, a word-boundary match or arithmetic — same collection, same config, same
+      benchmark, every time. The model writes prose about a measurement that was already
+      taken; it never decides whether we appeared.</div>
+    <div class="note warn"><b>Two hatched paths, and they are not the same claim.</b>
+      ${seamObs} readings were never collected because there is no key for those engines,
+      and ${Math.max(deadAir, 0)} were asked for and came back empty. Both are stored as
+      <code>unmeasured</code> and both are excluded from every rate — but a run where the
+      second number climbs is a broken instrument, and one where only the first is high is
+      simply a narrower one. Folding either into <i>absent</i> would report our own missing
+      credentials as evidence about the market.</div>
+  </section>`;
+}
+
 /* ------------------------------------------------------------------ load */
 
 let TAB = "leads";
@@ -1156,7 +1344,20 @@ async function load() {
   }
   const d = EMBED ? EMBED.report : await api("/api/report");
   if (!d || d.empty) {
-    $("#app").innerHTML = '<div class="empty">No completed run in this export.</div>';
+    $("#app").innerHTML = TAB === "cflow"
+      ? '<div class="empty">No Track C run yet — the flowchart carries the counts from a real collection. Press <b>Run live collection</b>.</div>'
+      : '<div class="empty">No completed run in this export.</div>';
+    return;
+  }
+  /* The Logic tab reads the same report payload, so it needs no second fetch —
+     and deliberately does not ask for the trend it would never draw. */
+  if (TAB === "cflow") {
+    $("#app").innerHTML = flowChartC(d);
+    const r = d.run || {};
+    $("#runmeta").textContent = r.started_at
+      ? `run ${r.id} · ${r.started_at} · engines: ${r.engines || "—"}`
+      : "no completed runs";
+    $("#hash").textContent = r.query_set_hash ? " · contract " + r.query_set_hash : "";
     return;
   }
   render(d, EMBED ? EMBED.trend : await api("/api/trend"));
@@ -1180,8 +1381,10 @@ async function poll() {
   await load();
 }
 
-/* The Logic tab reads the same lead run, so its button runs the same thing. */
-const runLabel = () => TAB === "aeo" ? "Run live collection" : "Run lead engine";
+/* Each Logic tab reads the run its own track produced, so its button runs the
+   same thing that tab is a picture of. */
+const isTrackC = () => TAB === "aeo" || TAB === "cflow";
+const runLabel = () => isTrackC() ? "Run live collection" : "Run lead engine";
 
 // Tabs work in the standalone export too, so a reviewer with no server can
 // still see both tracks.
@@ -1202,7 +1405,7 @@ if (!EMBED) {
     $("#btnrun").textContent = "Running…";
     $("#runpanel").classList.add("on");
     $("#log").textContent = "";
-    await api(TAB === "aeo" ? "/api/run" : "/api/leads/run", { method: "POST" });
+    await api(isTrackC() ? "/api/run" : "/api/leads/run", { method: "POST" });
     poll();
   };
   $("#btnexport").onclick = async () => {

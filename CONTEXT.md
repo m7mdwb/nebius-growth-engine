@@ -30,22 +30,39 @@ tolerated (*"How you use them is part of what we're evaluating"*).
 
 ## 🚦 Where things stand — read this first
 
-**Anthropic credit topped up 15 Aug. `scripts/probe.py` = 5/5 PASS.** Both tracks run.
+**Anthropic credit topped up 15 Aug. `scripts/probe.py` = 4/5 PASS.** Both tracks run.
+The one FAIL is the LinkedIn *person* scraper, and it is now a settled seam rather than an
+open task — see below. Company enrichment, Serper, Claude+web_search and the Anthropic
+drafting call all pass with real data shapes.
 
-### 🔴 ONE ACTION BLOCKS TRACK A, and it is a click
+### 🔒 PERSON ENRICHMENT IS A MARKED SEAM — the click was made, and it was not enough
 
-**Apify's `harvestapi` person scraper caps free accounts at 20 runs. We are past it.**
-Company enrichment still works (separate per-actor count); *person* enrichment does not,
-so no lead can earn seniority or function points.
+`dev_fusion` was approved in the Apify console on 15 Aug. The probe error **changed**,
+which is how we know the approval landed, and then it refused for a second reason:
 
-**Fix: approve `dev_fusion` once, here —**
-`https://console.apify.com/actors/2SyF0bVxmgGr8IVCZ?approvePermissions=true`
+```
+dev_fusion~linkedin-profile-scraper: ActorRefused: Users on the free Apify plan can run
+                                     the actor through the UI and not via other methods.
+harvestapi~linkedin-profile-scraper: ActorRefused: Free users are limited to 20 runs.
+```
 
-It wants full account access, which is why it was never enabled; it has no free-run cap.
-`enrich.PERSON_ACTORS` already tries it **first**, so approval is the whole fix — no code
-change. **Then re-run the lead engine**, because the run currently in the database was
-collected while the scraper was blocked and its scores are missing seniority (+25) and
-function (+12).
+So **both** actors in `enrich.PERSON_ACTORS` refuse: one is API-blocked for free accounts
+outright, the other is past its 20-run cap. That is two failures on one integration, so by
+the working order below it becomes a marked seam and stops being debugged. **The remaining
+lever is money, not code** — a paid Apify plan, nothing else.
+
+⚠️ **Do not reflexively re-run the lead engine.** Since the `ActorRefused` fix,
+`leads.py` stops a refused lead at `needs_review` *before scoring* (a refusal is a fact
+about our tooling, not about the lead). So a re-run today returns **4 leads in human
+review and 1 disqualified, and nothing scored, routed or drafted**. The run in the
+database (`lead run 8`) was collected while the scraper returned empty rather than
+refusing, so it still shows the full pipeline — scores, both intent gates, hot/warm/
+disqualified/review, and real drafts — with seniority and function sitting honestly under
+*"Not scored — and not scored as zero"*. **That is the better walkthrough, and it is the
+design working rather than a gap being hidden.** Say the cap out loud in the Loom.
+
+Company enrichment is unaffected (separate per-actor run count) and still live, which is
+why headcount, growth, industry and the reconciliation check are all real in that run.
 
 ⚠️ **Apify is a $5/month free plan and is the binding constraint on this whole project**
 — it funds Track A enrichment *and* the Track C AI Overviews engine. ~$1.63 used.
@@ -122,15 +139,32 @@ from systems we have no access to, and the brief says to use realistic mock data
 state the assumption. The firmographics underneath them are real and scraped live. That
 split is stated in `config/leads.yaml` and should be said out loud in the Loom.
 
-### Three tabs now
+### Four tabs now — one per track, each with its Logic tab beside it
 
-`Track A — Inbound lead engine` · **`Track A · Logic`** · `Track C — AI visibility`
+`Track A — Inbound lead engine` · **`Track A · Logic`** · `Track C — AI visibility` ·
+**`Track C · Logic`**
 
-The Logic tab is a **live flowchart**: nine stages down a spine with branch-offs to each
-terminal route, and **every node carries the count from the last real run**. It is a
+Each Logic tab is a **live flowchart**: stages down a spine with branch-offs to each
+terminal state, and **every node carries the count from the last real run**. It is a
 picture of what happened, not an illustration of the design — a branch that never fires
 reads `0`. The left edge colour-codes what *kind* of step each one is (free / paid call /
 rules / model), because keeping those kinds apart is the entire argument.
+
+**Track A · Logic** — nine stages, ending in the four routes.
+
+**Track C · Logic** — eight stages, contract → engines → repeats → classify → benchmark →
+source gap → SEO overlap → recommendations. It is built around the one distinction Track C
+exists to make, and the layout carries it: **there are two ways a cell ends up without a
+reading, and they leave the spine at different points.** A *declared seam* (ChatGPT,
+Perplexity — no key) leaves at the engine stage, having never made a call. *Dead air* (an
+error, a refusal, an empty answer from a live engine) leaves after the call. Both store
+`unmeasured`, neither is ever `absent`, and both are drawn with the same hatch this page
+has used for "nobody looked" since the first screen. On the current run that reads 40 and
+**0** — and the 0 is the point: it is the credit-exhaustion bug from `925e5b1` given a
+permanent place to show up.
+
+Both Logic tabs work in the standalone export as well as the live app — verified, they
+read the same embedded payload and make no API call.
 
 ## What already exists
 
