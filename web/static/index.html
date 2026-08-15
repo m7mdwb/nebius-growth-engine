@@ -200,6 +200,28 @@ footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
 .br.s-unmeasured .br-q{background:repeating-linear-gradient(45deg,transparent,transparent 5px,
   var(--grid) 5px,var(--grid) 6px);border-radius:3px}
 
+/* ---- the score: a hero number that comes apart ---- */
+.sc-rows{margin-top:16px;border-top:1px solid var(--border);padding-top:6px}
+.scr{display:grid;grid-template-columns:minmax(0,150px) 1fr 64px;gap:11px;
+  align-items:center;padding:9px 0 4px;border-top:1px solid var(--grid)}
+.scr:first-child{border-top:0}
+.scr-l{font-size:13px;color:var(--ink);font-weight:600}
+.scr-p{text-align:right;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.scr-p i{font-style:normal;font-weight:400;color:var(--muted)}
+/* An empty track still draws. A component measured at zero and a component that was
+   never measured must be told apart at a glance, so zero gets a visible empty bar
+   and unmeasured gets the hatch — never both rendering as nothing at all. */
+.scr .track{background:var(--surface-2);border:1px solid var(--grid);border-radius:4px;
+  height:15px;overflow:hidden}
+.scr .fill{height:100%;background:var(--series-1);border-radius:0 3px 3px 0}
+.scr-d{grid-column:1/-1;font-size:12px;color:var(--muted);padding-bottom:5px}
+.scr-d em{font-style:normal;color:var(--ink-2)}
+/* An excluded component is hatched, never a zero-length bar — a bar at zero and a
+   bar that was never drawn must not look alike. Same rule as the grid. */
+.scr.out .scr-l,.scr.out .scr-p{color:var(--muted)}
+.scr.out .track{border:1px dashed var(--axis);background:repeating-linear-gradient(45deg,
+  transparent,transparent 5px,var(--grid) 5px,var(--grid) 6px)}
+
 /* ---- source gap ---- */
 .kinds{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:12px}
 .kind{border:1px solid var(--border);border-radius:8px;padding:13px;background:var(--surface-2)}
@@ -340,6 +362,12 @@ footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
   .fnote{max-width:none}
 }
 
+/* ---- run picker ---- */
+.runpick{display:none;margin-top:9px;align-items:center;gap:7px;font-size:12.5px;color:var(--muted)}
+.runpick.on{display:flex}
+.runpick select{font:inherit;font-size:12.5px;background:var(--surface-1);color:var(--ink);
+  border:1px solid var(--axis);border-radius:6px;padding:5px 8px;max-width:340px}
+
 /* ---- key status ---- */
 .keys{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .keychip{font-size:11.5px;border:1px solid var(--border);border-radius:5px;padding:3px 8px;
@@ -357,6 +385,7 @@ footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
     <h1>AEO Monitor <span id="brand"></span></h1>
     <div class="meta" id="runmeta">loading…</div>
     <div class="keys" id="keys"></div>
+    <div id="runpickwrap" class="runpick"></div>
   </div>
   <div class="actions" id="actions">
     <button id="btnrun" class="primary">Run live collection</button>
@@ -381,9 +410,10 @@ footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
 <div id="app"><div class="empty">No runs yet. Press <b>Run live collection</b>.</div></div>
 
 <footer>
-  Presence, citation share and the competitor set are reported separately and never
-  blended into a single visibility score — one number that moves for reasons you
-  can't recover is worse than three you can act on.
+  The score is a total, not a verdict: presence, citation quality, citation share and
+  answer rank each keep their own points on the page, and a component that could not be
+  measured is held out of the denominator instead of scored as zero. A number you can
+  take apart is a number you can argue with.
   <span id="hash"></span>
 </footer>
 
@@ -543,15 +573,59 @@ function method(s, d) {
         ? "So any movement smaller than that spread is not a result. Production would run five repeats per cell and report a rate with a confidence band, flagging change only outside the noise."
         : "Stable across repeats in this run, which is a finding rather than an assumption — it is only known because the repeats were collected."}
     </div>
-    <div class="note"><b>What this does not do.</b> No composite 0–100 visibility score.
-      Presence, citation share and the competitor set move for different reasons and have
-      different fixes, so blending them would destroy the only actionable part.</div>
+    <div class="note"><b>What the score is not.</b> There <i>is</i> a 0–100 number at the
+      top of this page, because "are we winning" is a fair question and answering it with
+      four charts is a dodge. What it never does is <b>blend out of sight</b>: presence,
+      citation quality, citation share and answer rank move for different reasons and have
+      different fixes, so each keeps its own points on screen and the weights sit in
+      <code>config/queries.yaml</code> where they can be argued with. A score that drops
+      without telling you which of the four dropped is the thing worth refusing — not the
+      addition itself.</div>
   </section>`;
 }
 
 /* ---- the headline number: a COUNT, never a percentage ---- */
 const STATE_LABEL = { cited: "cited", mentioned: "mentioned", absent: "absent",
                       unmeasured: "not measured" };
+
+/* ---- the score. One number, and it comes apart on the page it sits on. ---- */
+function scorePanel(s) {
+  if (!s || !s.components) return "";
+  const out = s.excluded || [];
+  const rows = s.components.map(c => {
+    const pctw = c.measured && c.max ? Math.round(100 * c.earned / c.max) : 0;
+    return `<div class="scr ${c.measured ? "" : "out"}">
+      <div class="scr-l">${esc(c.label)}</div>
+      <div class="track"><div class="fill" style="width:${pctw}%"></div></div>
+      <div class="scr-p">${c.measured ? c.earned : "—"} <i>/ ${c.max}</i></div>
+      <div class="scr-d">${c.measured
+        ? `<em>${esc(c.detail)}</em> · ${esc(c.why)}`
+        : `<em>Not measured, so these ${c.max} points are held out of the total rather
+           than scored as zero</em> — ${esc(c.detail)}`}</div>
+    </div>`;
+  }).join("");
+
+  return `<section class="bench">
+    <div class="bench-top">
+      <div class="bench-n"><b>${s.earned}</b><span>of ${s.out_of}</span></div>
+      <div class="bench-txt">
+        <h2>AEO score</h2>
+        <p class="sub">One number, and <b>every point below shows where it came from</b>.
+          The weights live in <code>config/queries.yaml</code>, so this is arithmetic
+          anyone can re-run and disagree with in a diff — not a model's opinion, and not
+          a black box that drops without telling you which of four things to go and fix.
+          ${out.length
+            ? `<b class="warn-t">Scored out of ${s.out_of}, not ${s.max}:
+               ${out.map(c => esc(c.label.toLowerCase())).join(" and ")} could not be
+               measured on this run, so ${out.reduce((n, c) => n + c.max, 0)} points are
+               excluded rather than counted as failures.</b>`
+            : `All four components were measurable on this run, so it is scored out of
+               the full ${s.max}.`}</p>
+      </div>
+    </div>
+    <div class="sc-rows">${rows}</div>
+  </section>`;
+}
 
 function benchmarkHero(b) {
   if (!b || !b.out_of) return "";
@@ -708,15 +782,24 @@ function render(d, t) {
   $("#hash").textContent = r.query_set_hash ? " · contract " + r.query_set_hash : "";
 
   const s = d.summary;
+  /* Two different reasons a seeded run can be on screen, and they are not the same
+     statement. Saying "no measured run exists" while one sits in the picker would be
+     a false claim on the most prominent warning on the page. */
+  const chosen = RUNS && RUNS.some(x => !x.is_synthetic);
   const synthBanner = r.is_synthetic
     ? `<div class="note warn" style="margin:0 0 16px"><b>Every number on this page comes from
-       synthetic backfill.</b> No measured run exists in this database yet, so seeded data is
-       being shown so the interface is legible. Run a live collection before reading anything
-       here as a result.</div>`
+       synthetic backfill — nothing here was measured.</b> ${chosen
+        ? `You are viewing a <b>seeded</b> run deliberately, from the run picker: it is the
+           same board with the brand actually winning, which is what this tool is supposed to
+           look like once placements land. Switch back to a measured run to read a result.`
+        : `No measured run exists in this database yet, so seeded data is being shown so the
+           interface is legible. Run a live collection before reading anything here as a
+           result.`}</div>`
     : "";
 
   $("#app").innerHTML =
     synthBanner +
+    scorePanel(d.score) +
     benchmarkHero(d.benchmark) +
     tiles(s) +
     grid(d) +
@@ -1310,6 +1393,36 @@ function flowChartC(d) {
 
 let TAB = "leads";
 let CONFIG = null;
+/* Which Track C run is on screen. null = whatever the server calls latest, which
+   prefers a MEASURED run and only falls back to a seeded one when none exists. */
+let RUN_ID = null;
+let RUNS = null;
+
+/* The picker exists because the seeded runs are not decoration — they are the same
+   board with movement in it, and the only way to see what this tool looks like when
+   the brand is actually winning. They are reachable rather than hidden, and the
+   synthetic banner fires on `is_synthetic` in the payload, so switching to one
+   cannot quietly pass seeded data off as measured. */
+async function runPicker() {
+  const el = $("#runpickwrap");
+  if (!el) return;
+  if (EMBED || !isTrackC()) { el.classList.remove("on"); el.innerHTML = ""; return; }
+  if (!RUNS) {
+    try { RUNS = await api("/api/runs"); } catch (e) { return; }
+  }
+  if (!RUNS.length) return;
+  const dflt = [...RUNS].reverse().find(r => !r.is_synthetic) || RUNS[RUNS.length - 1];
+  const opts = [...RUNS].reverse().map(r => {
+    const on = RUN_ID ? String(r.id) === String(RUN_ID) : r.id === dflt.id;
+    return `<option value="${r.id}"${on ? " selected" : ""}>run ${r.id} · ${
+      esc((r.started_at || "").slice(0, 10))} · ${
+      r.is_synthetic ? "SEEDED, not measured" : "measured"}</option>`;
+  }).join("");
+  el.innerHTML = `<label for="runsel">Viewing</label>
+    <select id="runsel">${opts}</select>
+    <span>seeded runs show the same board with the brand winning</span>`;
+  el.classList.add("on");
+}
 
 /* Which credentials are present, and what each one turns on. PRESENCE ONLY —
    the value is never sent to the browser, so this is safe to leave on screen
@@ -1328,6 +1441,7 @@ async function load() {
   if (!EMBED && !CONFIG) {
     try { CONFIG = await api("/api/config"); keyChips(CONFIG.keys); } catch (e) { /* offline export */ }
   }
+  await runPicker();   // self-hides on the Track A tabs
   if (TAB === "leads" || TAB === "flow") {
     const d = EMBED ? EMBED.leads : await api("/api/leads");
     if (!d || d.empty) {
@@ -1342,7 +1456,8 @@ async function load() {
     $("#runmeta").textContent = `lead run ${d.run.id} · ${d.run.started_at} · fit ${d.run.fit_hash}`;
     return;
   }
-  const d = EMBED ? EMBED.report : await api("/api/report");
+  const d = EMBED ? EMBED.report
+                  : await api("/api/report" + (RUN_ID ? "?run_id=" + RUN_ID : ""));
   if (!d || d.empty) {
     $("#app").innerHTML = TAB === "cflow"
       ? '<div class="empty">No Track C run yet — the flowchart carries the counts from a real collection. Press <b>Run live collection</b>.</div>'
@@ -1378,6 +1493,10 @@ async function poll() {
   if (st.running) { setTimeout(poll, 600); return; }
   $("#btnrun").disabled = false;
   $("#btnrun").textContent = runLabel();
+  // A finished collection invalidates the picker: leaving RUN_ID pinned would show
+  // the run you were reading before, immediately after pressing the button that
+  // produced a newer one.
+  RUN_ID = null; RUNS = null;
   await load();
 }
 
@@ -1486,13 +1605,26 @@ document.addEventListener("click", async e => {
     $("#recs-out").innerHTML = '<div class="empty">reading the benchmark, the source gap ' +
       'and the overlap figure…</div>';
     try {
-      const r = await api("/api/recommendations");
+      // Pinned to the run ON SCREEN, not to "latest" — generating advice from one
+      // run while the reader is looking at another is how a dashboard lies politely.
+      const r = await api("/api/recommendations" + (RUN_ID ? "?run_id=" + RUN_ID : ""));
       $("#recs-out").innerHTML = recsPanel(r);
     } catch (err) {
       $("#recs-out").innerHTML = `<div class="note warn">${esc(String(err))}</div>`;
     }
     t.disabled = false; t.textContent = "Regenerate";
   }
+});
+
+/* Switching runs re-reads the whole board from the server rather than filtering
+   anything client-side — the benchmark, the source gap, the overlap and the score
+   are all DERIVED per request, so an older run gets today's analysis rules applied
+   to the answers it actually collected. */
+document.addEventListener("change", async e => {
+  if (!e.target || e.target.id !== "runsel") return;
+  RUN_ID = e.target.value;
+  $("#app").innerHTML = '<div class="empty">loading…</div>';
+  await load();
 });
 
 /* Enter submits the field it is in. */

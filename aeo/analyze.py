@@ -11,10 +11,13 @@ written down next to the code that implements it.
    sources, so the lever is usually not your own site. Ranking the domains the
    answers actually cite turns a dashboard into a list of things to go and do.
 
-3. NO COMPOSITE VISIBILITY SCORE. Every commercial tool in this space ships a
-   0-100 number. One number that moves for reasons you cannot recover is worse
-   than three you can act on, so presence rate, citation share and the
-   competitor set are reported separately and never blended.
+3. THE SCORE IS DECOMPOSED, NOT REFUSED. Every commercial tool in this space
+   ships a 0-100 number, and the objection to those is not that they add up —
+   it is that they add up OUT OF SIGHT, so a number that drops cannot tell you
+   which of four problems to go and fix. `score()` below adds up in public:
+   fixed weights from queries.yaml, every component displayed with its own
+   points and the sentence that produced it, and a component that could not be
+   measured excluded from the denominator instead of scored as zero.
 """
 
 from __future__ import annotations
@@ -445,6 +448,100 @@ def source_gap(observations: list[dict], citations: list[dict],
             for qid, v in per_query.items()
         ],
         "owned_citations_anywhere": sum(our_kinds.values()),
+    }
+
+
+# ---------------------------------------------------------------------------
+# The score. One number, taken apart on the page it appears on.
+# ---------------------------------------------------------------------------
+
+def score(bench: dict, summary: dict, observations: list[dict], cfg: Config) -> dict:
+    """A 0-100 AEO score whose every point names where it came from.
+
+    🔑 The objection this is built against is not "single numbers are bad" — it is
+    that a BLENDED number moves for reasons you cannot recover, so the person
+    watching it cannot tell which of four problems to go and fix. That is answered
+    by decomposition, not by refusing to add up: the components are computed here,
+    displayed individually next to the total, and weighted in queries.yaml where
+    somebody can disagree with them in a diff.
+
+    Same two rules as the lead score in Track A. It is arithmetic, so the same run
+    scores identically every time and no model is consulted. And every component
+    carries the sentence that produced it, so the number can be argued with.
+
+    ⚠️ THE DENOMINATOR DECLARES ITSELF. A component we could not measure is excluded
+    from the total and named, never scored as zero — "1 of 90, answer rank not
+    measurable on this run" is a different claim from "1 of 100", in exactly the way
+    "3 of 10" differs from "3 of 8". A zero that means "we looked and found nothing"
+    must never render the same as a zero that means "we never looked", and the score
+    is the number most likely to be quoted out of context, so it matters most here.
+    """
+    comps = cfg.score_components
+    floor = max(1, cfg.rank_floor)
+
+    def spec(key: str) -> tuple[int, str, str]:
+        c = comps.get(key) or {}
+        return int(c.get("points", 0)), c.get("label", key), c.get("why", "")
+
+    measured_q = bench.get("measured") or 0
+    out: list[dict] = []
+
+    def add(key: str, fraction: float | None, detail: str, why_not: str = "") -> None:
+        points, label, why = spec(key)
+        if fraction is None:
+            out.append({"key": key, "label": label, "max": points, "why": why,
+                        "measured": False, "earned": 0.0, "detail": why_not})
+            return
+        out.append({"key": key, "label": label, "max": points, "why": why,
+                    "measured": True, "earned": round(points * fraction, 1),
+                    "detail": detail})
+
+    # --- presence: did we show up at all, on the queries a buyer types ---------
+    add("presence",
+        (bench["appear_in"] / measured_q) if measured_q else None,
+        f"{bench['appear_in']} of {measured_q} measured benchmark queries named us",
+        "no benchmark query was measured on this run")
+
+    # --- citation quality: named WITH a link ----------------------------------
+    add("citation_quality",
+        (bench["cited"] / measured_q) if measured_q else None,
+        f"{bench['cited']} of {measured_q} carried a link to us",
+        "no benchmark query was measured on this run")
+
+    # --- citation share: how much of what gets cited is ours -------------------
+    total_c = summary.get("total_citations") or 0
+    add("citation_share",
+        (summary.get("owned_citations", 0) / total_c) if total_c else None,
+        f"{summary.get('owned_citations', 0)} of {total_c} cited sources are ours",
+        "the answers cited nothing on this run, so there is no share to take")
+
+    # --- answer rank: position among the brands named -------------------------
+    # Only defined on answers that named us. On a run where we never appear this is
+    # NOT zero — it is unmeasurable, and it leaves the denominator saying so.
+    bench_ids = {q.id for q in cfg.queries if getattr(q, "benchmark", True)}
+    ranks = [o["brand_rank"] for o in observations
+             if o.get("brand_rank") and o.get("is_live") and not o.get("error")
+             and o["query_id"] in bench_ids]
+    if ranks:
+        fracs = [max(0.0, (floor - (r - 1)) / floor) for r in ranks]
+        avg_rank = sum(ranks) / len(ranks)
+        add("answer_rank", sum(fracs) / len(fracs),
+            f"named at position {avg_rank:.1f} on average across {len(ranks)} answers "
+            f"(position {floor}+ scores nothing)")
+    else:
+        add("answer_rank", None, "",
+            "we were not named in any measured answer, so there is no position to hold")
+
+    earned = sum(c["earned"] for c in out)
+    out_of = sum(c["max"] for c in out if c["measured"])
+    return {
+        "earned": round(earned),
+        "earned_exact": round(earned, 1),
+        "out_of": out_of,
+        "max": sum(c["max"] for c in out),
+        "hash": cfg.score_hash,
+        "components": out,
+        "excluded": [c for c in out if not c["measured"]],
     }
 
 

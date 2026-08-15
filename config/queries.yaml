@@ -94,6 +94,67 @@ recommendations:
   model: claude-opus-5
   max_tokens: 8000
 
+# =========================================================================
+# THE SCORE — one number, and every point shows where it came from.
+# =========================================================================
+#
+# 🔑 The objection to a single AEO score is real, and it is NOT "scores are bad" —
+# it is that every tool in this category ships a blended 0-100 that moves for
+# reasons you cannot recover, so a CMO watching it drop cannot tell which of four
+# different problems to go and fix. That objection is answered by DECOMPOSITION,
+# not by refusing to add up.
+#
+# So this score obeys the same two rules as the lead score in leads.yaml:
+#
+#   1. It is ARITHMETIC over measurements already on the page. No model decides it,
+#      and the same run scores the same every time.
+#   2. Every component is displayed with its own points, its own maximum and the
+#      sentence that produced it. A number you can take apart is a number you can
+#      argue with, and one you cannot is just a mood.
+#
+# ⚠️ AND THE DENOMINATOR DECLARES ITSELF. A component that could not be measured is
+# EXCLUDED and named — it never scores zero. "1 of 90, rank not measurable this run"
+# and "1 of 100" are different claims, exactly as "3 of 10" and "3 of 8" are, and the
+# reader is entitled to know which one they are looking at. A zero that means "we
+# looked and found nothing" and a zero that means "we never looked" must not share
+# a rendering, in the score least of all — it is the most-quoted number on the page.
+#
+# Changing any weight changes what the score means, so the weights are hashed
+# separately (`score_hash`, the analogue of Track A's `fit_hash`). The score trend
+# breaks when they move; the presence and citation trends do not, because those are
+# measurements rather than judgements.
+score:
+  components:
+    # Did we show up at all, on the ten questions a buyer actually types? The
+    # heaviest weight, because everything else is downstream of being in the answer.
+    presence:
+      label: Presence
+      points: 40
+      why: Benchmark queries where we were cited or mentioned, out of those measured.
+    # Cited outranks mentioned and is weighted for it: a link is traffic and a
+    # citation is a source the model will reuse. Being named without one is recall
+    # with nowhere to go.
+    citation_quality:
+      label: Citation quality
+      points: 30
+      why: Benchmark queries where the answer carried a LINK to us, not just our name.
+    # Of everything the answers cite, how much is ours. This is the one that moves
+    # when a placement lands, which makes it the operating metric between runs.
+    citation_share:
+      label: Citation share
+      points: 20
+      why: Share of all cited sources across the run that are on our own domains.
+    # Position is signal in an AI answer the same way it is in a SERP. Only
+    # measurable on answers that named us at all — so on a run where we never
+    # appear it is EXCLUDED from the denominator rather than scored as zero.
+    answer_rank:
+      label: Answer rank
+      points: 10
+      why: Where we sit among the brands named, on the answers that named us.
+  # Ranks beyond this are treated as "named, effectively invisible" and score 0 for
+  # the rank component. Fifth in a list of eleven is not a placement.
+  rank_floor: 5
+
 run:
   # Repeats per query per engine. THIS IS THE POINT: LLM answers are
   # non-deterministic, so one sample is not a measurement. 3 is the demo setting;

@@ -138,6 +138,9 @@ def api_report(run_id: int | None = None) -> JSONResponse:
         "run": run,
         "summary": summary,
         "benchmark": bench,
+        # Derived like everything else, so re-weighting the components in
+        # queries.yaml re-scores history instead of needing a re-run.
+        "score": analyze.score(bench, summary, obs, cfg),
         "source_gap": gap,
         "seo": seo,
         # Measured from response.usage, not estimated. Zero for runs collected

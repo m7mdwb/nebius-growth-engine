@@ -187,8 +187,20 @@ argument:
 2. **The cited domains are the output.** AI answers ground on third-party sources, so
    the lever is usually not your own site. Ranking what the answers actually cite turns
    a dashboard into a list of places to go and get placed.
-3. **No composite 0–100 score.** One number that moves for reasons you cannot recover
-   is worse than three you can act on.
+3. **The score is decomposed, not refused.** ⚠️ *This one changed on 16 Aug, and the
+   change is deliberate.* The original position was "no composite 0–100 score at all".
+   The sharper version: the objection to every commercial tool's score is not that it
+   adds up, it is that it adds up **out of sight** — a number that drops cannot tell you
+   which of four problems to fix. So `analyze.score()` adds up in public: weights in
+   `config/queries.yaml` (hashed separately as `score_hash`, the analogue of Track A's
+   `fit_hash`), every component rendered with its own points and the sentence that
+   produced it, and **any component that could not be measured is excluded from the
+   denominator rather than scored as zero.** The real run reads **1 of 90** — answer
+   rank is unmeasurable when nothing named us, so its 10 points are held out and said
+   so. A seeded run reads **55 of 100** with all four live.
+   This also settles an inconsistency: Track A scored leads out of ~100 with every
+   point sourced while Track C refused to score at all, and a reviewer comparing the
+   two tabs would have found that harder to defend than either position alone.
 
 And two bugs the sample set caught, both already fixed, both worth keeping in the
 walkthrough because they are the kind of thing that makes a scoring system quietly

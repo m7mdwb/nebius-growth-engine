@@ -102,6 +102,30 @@ class Config:
         idx = [q.id for q in self.queries].index(query.id)
         return self.repeats if idx < self.repeat_subset else 1
 
+    # ---- the score ---------------------------------------------------------
+    @property
+    def score_components(self) -> dict:
+        return dict(self.raw.get("score", {}).get("components", {}))
+
+    @property
+    def rank_floor(self) -> int:
+        return int(self.raw.get("score", {}).get("rank_floor", 5))
+
+    @property
+    def score_hash(self) -> str:
+        """Fingerprint of the SCORING JUDGEMENT, kept apart from the query contract.
+
+        The analogue of Track A's `fit_hash`. Re-weighting the components changes
+        what the score means without changing what was measured, so it gets its own
+        hash: the score trend breaks, the presence and citation trends do not.
+        Folding both into one hash would throw away comparable measurements every
+        time somebody argued about a weight, which is the opposite of the point.
+        """
+        blob = json.dumps({"components": self.score_components,
+                           "rank_floor": self.rank_floor},
+                          sort_keys=True, ensure_ascii=False)
+        return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:12]
+
     # ---- comparability -----------------------------------------------------
     @property
     def query_set_hash(self) -> str:
