@@ -1077,8 +1077,12 @@ function renderLeads(d) {
         point below shows where it came from.</p>
       ${genericWarn}
       ${d.leads.map(leadCard).join("")}
+      <div class="note"><b>Every weight behind those points is on the
+        <i>Track A · Logic</i> tab</b> — the bands, the seniority tiers, the routing
+        thresholds and the enrichment waterfall, all read live from
+        <code>config/leads.yaml</code>. This tab is what the engine decided; that one is
+        what it decides with.</div>
     </section>` +
-    (d.method ? scoringMethod(d.method) + enrichmentMethod(d.method) : "") +
     `<section>
       <h2>Three decisions worth arguing about</h2>
       <div class="note"><b>Disqualifiers run before scoring, and they are absolute.</b>
@@ -1451,8 +1455,15 @@ async function load() {
       return;
     }
     $("#app").innerHTML = "";
-    if (TAB === "flow") $("#app").innerHTML = flowChart(d);
-    else renderLeads(d);
+    /* The Logic tab is the mechanism: the flow FIRST, because it is the shape of the
+       thing, then the rule tables the deciding stages read from. They used to sit
+       under the lead cards, which put ~44 rows of policy on the tab whose job is
+       showing what came out — the same category error as documenting an engine
+       inside its own output. */
+    if (TAB === "flow") {
+      $("#app").innerHTML = flowChart(d) +
+        (d.method ? scoringMethod(d.method) + enrichmentMethod(d.method) : "");
+    } else renderLeads(d);
     $("#runmeta").textContent = `lead run ${d.run.id} · ${d.run.started_at} · fit ${d.run.fit_hash}`;
     return;
   }
