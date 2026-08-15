@@ -160,7 +160,9 @@ name + surname + work email
         ▼  disqualify → score (rules) → route → infer pain points + draft (model)
 ```
 
-About **$0.025 and 20 seconds per lead.**
+About **$0.06 and 20 seconds per lead** — measured on lead run 11, not estimated:
+$0.039 Anthropic for the pain points and the draft (read from `response.usage`), plus
+~$0.001 Serper and ~$0.02 for the two Apify actors.
 
 ### Rules decide, the model writes
 
@@ -224,7 +226,7 @@ Every call's `response.usage` is stored per observation, so these are queries
 
 | | |
 |---|---|
-| One lead | ~$0.05 — Anthropic draft, plus 1 Serper query + 2 Apify calls |
+| One lead | **~$0.06** — $0.039 Anthropic (measured, run 11) + ~$0.001 Serper + ~$0.02 for 2 Apify actors |
 | One full Track C run (80 steps) | ~$2.45 Anthropic (incl. ~$0.80 web search) + ~$0.65 Apify |
 | Rehearsal: `--limit 3 --engine claude` | ~$0.35, zero Apify |
 | The probe | under five cents |

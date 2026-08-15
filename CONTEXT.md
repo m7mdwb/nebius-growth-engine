@@ -30,39 +30,34 @@ tolerated (*"How you use them is part of what we're evaluating"*).
 
 ## 🚦 Where things stand — read this first
 
-**Anthropic credit topped up 15 Aug. `scripts/probe.py` = 4/5 PASS.** Both tracks run.
-The one FAIL is the LinkedIn *person* scraper, and it is now a settled seam rather than an
-open task — see below. Company enrichment, Serper, Claude+web_search and the Anthropic
-drafting call all pass with real data shapes.
+**Anthropic credit topped up 15 Aug. Apify on the paid Starter plan 15 Aug.
+`scripts/probe.py` = 5/5 PASS.** Both tracks run, every integration verified live.
 
-### 🔒 PERSON ENRICHMENT IS A MARKED SEAM — the click was made, and it was not enough
+### ✅ PERSON ENRICHMENT IS LIVE — it took a click *and* $29
 
-`dev_fusion` was approved in the Apify console on 15 Aug. The probe error **changed**,
-which is how we know the approval landed, and then it refused for a second reason:
+The history is worth keeping, because it is two different failures wearing the same
+face. `dev_fusion` first refused with `ForbiddenError` (needs account approval). It was
+approved — and then refused again for an entirely different reason: *"Users on the free
+Apify plan can run the actor through the UI and not via other methods."* Meanwhile
+`harvestapi` was past its 20-run free cap. Two actors, two unrelated walls, one symptom.
 
-```
-dev_fusion~linkedin-profile-scraper: ActorRefused: Users on the free Apify plan can run
-                                     the actor through the UI and not via other methods.
-harvestapi~linkedin-profile-scraper: ActorRefused: Free users are limited to 20 runs.
-```
+The Starter plan ($29, and it is spendable credit rather than a fee — dev_fusion bills
+$10 per 1,000 profiles, so a lead costs about a cent) cleared both. **`enrich.PERSON_ACTORS`
+already tried dev_fusion first, so no code change was needed to switch over — but a code
+change was needed the moment it answered**, see below.
 
-So **both** actors in `enrich.PERSON_ACTORS` refuse: one is API-blocked for free accounts
-outright, the other is past its 20-run cap. That is two failures on one integration, so by
-the working order below it becomes a marked seam and stops being debugged. **The remaining
-lever is money, not code** — a paid Apify plan, nothing else.
+⚠️ **And the probe caught the trap on the way in.** dev_fusion returns *none* of
+harvestapi's `currentPosition[]` fields. The old mapper read `pos.get("position")` against
+a dict that does not exist there, so a perfectly good scrape would have produced
+title-from-`headline` and a null company — seniority derived from self-written marketing
+copy ("Chairman and CEO at Microsoft") while the structured `jobTitle` ("Chairman and
+CEO") sat unread in the same payload. A *thin record*, which the scorer treats as an
+honest unknown. `enrich.py` now normalises per actor and stores `source_actor` in the
+trace. **Two actors that answer the same question in different shapes is the reason
+`probe.py` prints the data shape and not just PASS.**
 
-⚠️ **Do not reflexively re-run the lead engine.** Since the `ActorRefused` fix,
-`leads.py` stops a refused lead at `needs_review` *before scoring* (a refusal is a fact
-about our tooling, not about the lead). So a re-run today returns **4 leads in human
-review and 1 disqualified, and nothing scored, routed or drafted**. The run in the
-database (`lead run 8`) was collected while the scraper returned empty rather than
-refusing, so it still shows the full pipeline — scores, both intent gates, hot/warm/
-disqualified/review, and real drafts — with seniority and function sitting honestly under
-*"Not scored — and not scored as zero"*. **That is the better walkthrough, and it is the
-design working rather than a gap being hidden.** Say the cap out loud in the Loom.
-
-Company enrichment is unaffected (separate per-actor run count) and still live, which is
-why headcount, growth, industry and the reconciliation check are all real in that run.
+**Current state: `lead run 11`.** All three enrichable leads carry real structured titles,
+exec seniority (+25) and function (+12). Scores 144 / 95 / 124. Four of seven routes fire.
 
 ⚠️ **Apify is a $5/month free plan and is the binding constraint on this whole project**
 — it funds Track A enrichment *and* the Track C AI Overviews engine. ~$1.63 used.
@@ -131,7 +126,7 @@ people can be typed in and the output checked against reality.
 | **scores or qualifies against a fit definition you design** | `config/leads.yaml` | 6 factors + 4 disqualifier classes, versioned by `fit_hash`. Arithmetic, never a prompt |
 | **routes it** (*"MQL to nurture vs. hot lead to Sales"*) | `leads.route()` | hot (5 min) · warm (24h) · revisit_6mo · hold, **plus** disqualified / needs_review / capped |
 | **drafts a genuinely personalized first-touch message** | `leads.draft()` | Pain points inferred from the company's own words; `facts_used` declared per draft; generic drafts counted |
-| **run end-to-end on 3–5 sample leads, show the outputs** | samples + dashboard | 5 samples, and **every branch fires** |
+| **run end-to-end on 3–5 sample leads, show the outputs** | samples + dashboard | 5 samples reaching **four of the seven routes** — hot ×2, warm, disqualified, needs_review. `revisit_6mo`, `hold` and `capped` have never fired and render as `0`, which is a measurement, not a gap |
 
 **The one honest gap, and the brief permits it:** the behavioural signals (assessment
 completed, demo booked, webinar attended) are **mocked** — they are first-party events
@@ -159,9 +154,25 @@ reading, and they leave the spine at different points.** A *declared seam* (Chat
 Perplexity — no key) leaves at the engine stage, having never made a call. *Dead air* (an
 error, a refusal, an empty answer from a live engine) leaves after the call. Both store
 `unmeasured`, neither is ever `absent`, and both are drawn with the same hatch this page
-has used for "nobody looked" since the first screen. On the current run that reads 40 and
-**0** — and the 0 is the point: it is the credit-exhaustion bug from `925e5b1` given a
-permanent place to show up.
+has used for "nobody looked" since the first screen.
+
+⚠️ **On the current run that reads 40 and 20, and the 20 is a scar.** It used to read
+`40 and 0`, and this file used to celebrate that zero — wrongly. Commit `925e5b1` fixed
+`classify()` so an errored engine stores as `unmeasured`, but it never migrated the rows
+already written, so run 3 still held **20 Claude readings that failed with HTTP 400 when
+the Anthropic credit ran out mid-collection, filed as `absent`**. The dashboard was
+asserting twenty times that we had looked and were not there, on twenty occasions when we
+never looked at all — the precise failure this whole project is built to expose, sitting
+inside the feature built to expose it.
+
+It survived because every *rate* was already correct: `summarise()` and `benchmark()` both
+filter on `error IS NOT NULL`, so the numbers on the page were right while the stored
+status underneath them was a lie, waiting for the first consumer that read `status`
+directly. The Logic tab was that consumer. Corrected by
+`scripts/fix_errored_status.py` — committed rather than run quietly, because a silent
+`UPDATE` against measurement history is its own version of the same sin. **The benchmark
+and the score did not move (0 of 10, 1 of 90), which is the proof the correction touched
+only the stored status and no reported number.**
 
 Both Logic tabs work in the standalone export as well as the live app — verified, they
 read the same embedded payload and make no API call.

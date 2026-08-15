@@ -81,7 +81,8 @@ store nor the scoring arithmetic is near a limit.
   to remember to open.
 
 **Track A at 10×** (500 inbound leads/week):
-- At $0.025 a lead that is ~$13/week, so **cost is not the constraint — accuracy is.**
+- At the measured **$0.06** a lead that is ~$30/week, so **cost is still not the
+  constraint — accuracy is.**
 - The waterfall needs a second and third provider. No single B2B source exceeds roughly
   **70% match rate** on a real inbound list; chaining three to five lifts it to **85–95%**.
   That gap is the whole argument: one provider means one lead in three arrives blank, and

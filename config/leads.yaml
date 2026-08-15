@@ -329,9 +329,20 @@ drafting:
   infer_pain_points: true
   max_pain_points: 3
 
-# Five sample leads, deliberately not five good ones — every routing branch is
-# exercised by one of them. The form on the Track A tab does the same thing for any
-# name and email you type; these exist so a walkthrough has something to press.
+# Five sample leads, deliberately not five good ones. Four of the seven terminal
+# routes are exercised by them: hot (twice), warm, disqualified and needs_review.
+#
+# ⚠️ THREE ROUTES HAVE NEVER FIRED, and saying "every branch is exercised" — which
+# this comment used to claim — was simply false. `revisit_6mo` needs a lead that
+# clears 20 points and has no buying signal at all; `hold` needs one under 20; and
+# `capped` only fires when a run hits its Apify ceiling mid-batch. None of the five
+# produce those. They are reachable and the routing table renders them at zero,
+# which is the honest state — a count of 0 on a branch is a measurement, and it is
+# the same rule the rest of this repo follows. Adding two throwaway leads purely to
+# light up the remaining rows would be decorating the demo rather than testing it.
+#
+# The form on the Track A tab does the same thing for any name and email you type;
+# these exist so a walkthrough has something to press.
 #
 # 🔑 WHAT IS REAL HERE AND WHAT IS NOT, because the difference is the whole point:
 #

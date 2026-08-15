@@ -78,9 +78,13 @@ td.q em{display:block;font-style:normal;font-size:10.5px;color:var(--muted);lett
 td.cell{height:34px;text-align:center;border-radius:5px;font-size:12px;font-weight:700;color:#fff;position:relative}
 .s-cited{background:var(--cell-cited)}
 .s-mentioned{background:var(--cell-mentioned);color:#2a1f00}
-.s-absent{background:var(--cell-absent);color:var(--muted);border:1px solid var(--grid)}
+/* ⚠️ --ink-2, not --muted. On the light palette, --muted (#898781) on --cell-absent
+   (#f4f3ef) is about 3.3:1 — under AA, and the hatched seam label was worse. These
+   two cells carry the distinction the whole tool exists to make, and it was legible
+   in dark mode only. Caught by reviewing the app in the theme I was not building in. */
+.s-absent{background:var(--cell-absent);color:var(--ink-2);border:1px solid var(--grid)}
 .s-seam{
-  color:var(--muted);border:1px dashed var(--axis);
+  color:var(--ink-2);border:1px dashed var(--axis);
   background:repeating-linear-gradient(45deg,transparent,transparent 4px,var(--grid) 4px,var(--grid) 6px);
 }
 .cell .split{position:absolute;top:2px;right:4px;font-size:10px;font-weight:700;opacity:.95}
@@ -443,13 +447,7 @@ footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
 
 <div id="app"><div class="empty">No runs yet. Press <b>Run live collection</b>.</div></div>
 
-<footer>
-  The score is a total, not a verdict: presence, citation quality, citation share and
-  answer rank each keep their own points on the page, and a component that could not be
-  measured is held out of the denominator instead of scored as zero. A number you can
-  take apart is a number you can argue with.
-  <span id="hash"></span>
-</footer>
+<footer><span id="footnote"></span><span id="hash"></span></footer>
 
 </div>
 
@@ -1507,7 +1505,28 @@ function keyChips(keys) {
        ${esc(k.name)} ${k.present ? "set" : "not set"}</span>`).join("");
 }
 
+/* The footer argues for whichever track is on screen. It used to carry Track C's
+   score argument under the lead engine — the tab where citation share means
+   nothing — which is the kind of leak that tells a reader nobody re-read the page
+   after building it. */
+const FOOTNOTES = {
+  C: `The score is a total, not a verdict: presence, citation quality, citation share
+      and answer rank each keep their own points on the page, and a component that
+      could not be measured is held out of the denominator instead of scored as zero.
+      A number you can take apart is a number you can argue with.`,
+  A: `Rules decide and the model writes. The score is arithmetic over
+      <code>config/leads.yaml</code> and every point shows its source; a factor we
+      could not measure is named rather than scored as zero. The model infers pain
+      points and writes the draft — it never touches the number, the route or the SLA.`,
+};
+
+function footnote() {
+  const el = $("#footnote");
+  if (el) el.innerHTML = isTrackC() ? FOOTNOTES.C : FOOTNOTES.A;
+}
+
 async function load() {
+  footnote();
   if (!EMBED && !CONFIG) {
     try { CONFIG = await api("/api/config"); keyChips(CONFIG.keys); } catch (e) { /* offline export */ }
   }
