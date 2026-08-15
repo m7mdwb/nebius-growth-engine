@@ -337,6 +337,8 @@ footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
 .recon.v-weak{border-left-color:#a16207}
 .recon.v-mismatch{border-left-color:#b91c1c}
 .recon.v-thin{border-left-color:#7c3aed}
+.recon.v-unconfirmed{border-left-color:#7c3aed;background:repeating-linear-gradient(45deg,
+  transparent,transparent 5px,var(--grid) 5px,var(--grid) 6px)}
 .gaps{font-size:12px;margin:8px 0;color:var(--muted)}
 .gaps b{display:block;margin-bottom:4px;color:var(--ink-2)}
 .gaps span{display:block;padding:2px 0 2px 11px;border-left:2px solid var(--grid)}
@@ -904,6 +906,9 @@ const RECON_LABEL = {
   verified: "verified against the email domain",
   weak: "weak match — company name only, website differs",
   mismatch: "MISMATCH — probably a different person",
+  // No profile came back, so the company was derived from the email domain and
+  // matching it against that domain proves nothing. Deliberately not "verified".
+  unconfirmed: "UNCONFIRMED — no profile found, so nothing corroborates the person",
   thin: "nothing found to reconcile",
 };
 

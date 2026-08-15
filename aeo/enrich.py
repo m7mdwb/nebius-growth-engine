@@ -12,7 +12,8 @@ explicit list of what we still do not know come out.
                      Apify: company scrape                             (1 call)
                             │
                             ▼
-                     RECONCILE against the email domain  ──▶ verified | mismatch | thin
+          RECONCILE against the email domain AND the mailbox
+                  ──▶ verified | weak | mismatch | unconfirmed | thin
 
 Three calls per lead, capped by `cost.Budget`. Field names below are **observed**, not
 documented — every one was read off a live response by `scripts/probe.py` on
@@ -326,19 +327,87 @@ def scrape_company(url_or_name: str, budget: Budget) -> dict:
 # step 4 — reconcile. The step that makes the rest trustworthy.
 # ---------------------------------------------------------------------------
 
-def reconcile(person: dict, company: dict, email_domain: str) -> dict:
+def name_matches_mailbox(person: dict, email_local: str) -> bool | None:
+    """Does the scraped person's name appear in the mailbox they wrote from?
+
+    ⚠️ THE SECOND HALF OF RECONCILIATION, and it was missing. The company check below
+    proves the record belongs to the right ORGANISATION. It says nothing about whether
+    it belongs to the right HUMAN — and the failure it misses is the worse one: search
+    for a name at a big employer, land on a different employee of that same employer,
+    and the company reconciles perfectly. You get a green "verified" badge on a
+    stranger's career, attached to a real person's email, scoring well because every
+    field is complete.
+
+    The mailbox is checked, not the typed name. What someone types into a form is a
+    search hint and can be an abbreviation, a nickname or a maiden name; the address
+    they wrote from is a fact we already hold. So "Judi W." typed against
+    judith.wiese@siemens.com is fine as long as the PROFILE that came back is Judith
+    Wiese's.
+
+    Returns None when there is nothing to compare — no scraped name, or a mailbox too
+    short to carry one. None means "not checked", never "passed".
+    """
+    first = (person.get("first_name") or "").strip().lower()
+    last = (person.get("last_name") or "").strip().lower()
+    local = re.sub(r"[^a-z]", "", (email_local or "").lower())
+    if not (first or last) or len(local) < 3:
+        return None
+    # Substring rather than equality, so j.wiese, jwiese, wiese.j and
+    # judith.wiese.ext all match, and compound surnames survive.
+    return any(len(n) >= 3 and n in local for n in (first, last))
+
+
+def reconcile(person: dict, company: dict, email_domain: str,
+              email_local: str = "") -> dict:
     """Is this scraped record actually the person who filled in the form?
 
-    The email domain is the only fact a search engine did not propose, so it is the
-    only thing worth checking against. Three outcomes, and the middle one is the
-    reason this function exists.
+    Two checks, because there are two ways to be wrong. The email domain and the
+    mailbox are the only facts a search engine did not propose to us, so they are the
+    only things worth checking against: the domain proves the ORGANISATION, the
+    mailbox proves the PERSON.
     """
     ed = registrable(email_domain)
     site = registrable(host_of(company.get("website") or ""))
+    name_ok = name_matches_mailbox(person, email_local)
+
+    # ⚠️ NO PERSON RECORD MEANS THE COMPANY CHECK IS CIRCULAR, and it used to return
+    # "verified" anyway. Found by typing an abbreviated name that the search could not
+    # resolve: no profile was found, so the company was derived from the email domain
+    # by company_guess(), looked up, and then congratulated for having a website that
+    # matches the domain it was derived from. Of course it matches. We proved that
+    # siemens.com is Siemens, which we already knew, and rendered a green badge that
+    # reads as "we confirmed this person".
+    #
+    # Reconciliation exists to corroborate a record against something it did not come
+    # from. With no profile there is nothing to corroborate, and the honest verdict
+    # says so. The lead still scores on company firmographics and its own behaviour —
+    # those are real — and seniority and function land in `gaps` where they belong.
+    if not person and not company:
+        return {"verdict": "thin", "on": "nothing was found to reconcile", "detail": ""}
+
+    if not person:
+        return {"verdict": "unconfirmed",
+                "on": "no profile was found, so nothing corroborates the person",
+                "detail": f"the company ({site or ed}) was derived from the email domain "
+                          f"rather than from a profile, so matching it against that same "
+                          f"domain proves nothing about who sent this"}
 
     if site and ed and site == ed:
-        return {"verdict": "verified", "on": "company website matches the email domain",
-                "detail": f"{site} == {ed}"}
+        # Right company, wrong person — the failure the company check cannot see.
+        # It goes to a human, because scoring it would not produce a low number, it
+        # would produce a plausible one belonging to somebody else.
+        if name_ok is False:
+            who = f"{person.get('first_name') or ''} {person.get('last_name') or ''}".strip()
+            return {"verdict": "mismatch",
+                    "on": "the company matches, but the profile is not this mailbox's owner",
+                    "detail": f"scraped '{who}' at the right company ({site}), but the "
+                              f"mailbox is '{email_local}@' — same employer, and most "
+                              f"likely a different employee"}
+        return {"verdict": "verified",
+                "on": "company website matches the email domain"
+                      + (" and the profile name matches the mailbox" if name_ok else ""),
+                "detail": f"{site} == {ed}"
+                          + (f" · '{email_local}@' matches the profile name" if name_ok else "")}
 
     # Fall back to name similarity: plenty of companies list a marketing site on a
     # different domain from the one they issue email on. Weaker, and labelled weaker.
@@ -454,7 +523,8 @@ def enrich(lead: dict, budget: Budget, on_note=None) -> dict:
         rec["unknowns"] += ["company", "headcount", "industry"]
 
     # --- 3. reconcile -------------------------------------------------------
-    rec["reconciliation"] = reconcile(rec["person"], rec["company"], domain)
+    rec["reconciliation"] = reconcile(rec["person"], rec["company"], domain,
+                                      email_local=email.split("@")[0])
     note(f"reconciliation: {rec['reconciliation']['verdict']} — {rec['reconciliation']['on']}")
 
     # --- 4. what we still do not know --------------------------------------
