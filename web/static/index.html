@@ -59,10 +59,11 @@ button.primary{background:var(--series-1);border-color:var(--series-1);color:#ff
 
 section{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:16px}
 h2{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
-/* 74ch was the textbook measure and it read as a broken column next to full-width
-   tables and grids — half the card empty on a 1200px screen. 96ch is still inside
-   comfortable reading range at this size and stops the page looking ragged. */
-.sub{font-size:13px;color:var(--ink-2);margin-bottom:14px;max-width:96ch}
+/* No measure cap. 74ch is the textbook answer and it read as a broken column beside
+   full-width tables and grids — half the card empty on a wide screen, on every panel.
+   `.wrap` already caps the page at 1220px, so that is the measure now, and the body
+   text lines up with the tables and rails it sits above instead of stopping short. */
+.sub{font-size:13px;color:var(--ink-2);margin-bottom:14px}
 
 /* ---- stat tiles: hero numbers, no chart ---- */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
@@ -210,7 +211,7 @@ svg{display:block;width:100%;height:auto;overflow:visible}
 .mtwrap{overflow-x:auto}
 .grp{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);margin:18px 0 5px}
 .grp:first-child{margin-top:0}
-.grpwhy{font-size:12.5px;color:var(--ink-2);margin-bottom:9px;max-width:96ch}
+.grpwhy{font-size:12.5px;color:var(--ink-2);margin-bottom:9px}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;background:var(--surface-2);
   border:1px solid var(--border);border-radius:4px;padding:1px 5px}
 
@@ -396,7 +397,7 @@ footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
   flex:0 0 auto}
 .fsub{font-size:13px;color:var(--ink-2);margin-top:3px}
 .fnote{font-size:12.5px;color:var(--muted);margin-top:6px;padding-left:10px;
-  border-left:2px solid var(--grid);max-width:96ch}
+  border-left:2px solid var(--grid)}
 .fnote b{color:var(--ink-2)}
 
 /* branch-offs: indented, so the eye reads them as leaving the spine */
