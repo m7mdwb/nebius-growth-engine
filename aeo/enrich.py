@@ -363,7 +363,7 @@ def reconcile(person: dict, company: dict, email_domain: str) -> dict:
 # the waterfall
 # ---------------------------------------------------------------------------
 
-def enrich(lead: dict, budget: Budget) -> dict:
+def enrich(lead: dict, budget: Budget, on_note=None) -> dict:
     """Run the whole lookup. Never raises except on budget — see cost.py.
 
     Returns a record that ALWAYS carries `unknowns`. A field we did not get is named
@@ -381,6 +381,11 @@ def enrich(lead: dict, budget: Budget) -> dict:
 
     def note(msg: str) -> None:
         rec["trace"].append(msg)
+        # The trace is already the audit log of this lookup; streaming it out as it
+        # is written means the UI can show the real stage it is on rather than a
+        # progress bar animating against a guess.
+        if on_note:
+            on_note(msg)
 
     if not domain:
         rec["unknowns"].append("company_domain")

@@ -59,7 +59,10 @@ button.primary{background:var(--series-1);border-color:var(--series-1);color:#ff
 
 section{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:16px}
 h2{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
-.sub{font-size:13px;color:var(--ink-2);margin-bottom:14px;max-width:74ch}
+/* 74ch was the textbook measure and it read as a broken column next to full-width
+   tables and grids — half the card empty on a 1200px screen. 96ch is still inside
+   comfortable reading range at this size and stops the page looking ragged. */
+.sub{font-size:13px;color:var(--ink-2);margin-bottom:14px;max-width:96ch}
 
 /* ---- stat tiles: hero numbers, no chart ---- */
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
@@ -161,6 +164,8 @@ svg{display:block;width:100%;height:auto;overflow:visible}
 .lr-sc small{font-size:10.5px;color:var(--muted);font-weight:400}
 .lr-int{text-align:right;font-size:12.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 .lr-route{text-align:right}
+.lrow.fresh{border-color:var(--series-1);box-shadow:0 0 0 3px color-mix(in srgb,var(--series-1) 18%,transparent)}
+.freshnote{font-size:11.5px;color:var(--series-1);margin:-2px 0 8px 14px}
 .lr-body{padding:4px 15px 14px;margin-top:3px;border-top:1px solid var(--grid)}
 .lr-meta{font-size:12px;color:var(--muted);margin:10px 0 2px}
 @media(max-width:760px){
@@ -205,7 +210,7 @@ svg{display:block;width:100%;height:auto;overflow:visible}
 .mtwrap{overflow-x:auto}
 .grp{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);margin:18px 0 5px}
 .grp:first-child{margin-top:0}
-.grpwhy{font-size:12.5px;color:var(--ink-2);margin-bottom:9px;max-width:78ch}
+.grpwhy{font-size:12.5px;color:var(--ink-2);margin-bottom:9px;max-width:96ch}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;background:var(--surface-2);
   border:1px solid var(--border);border-radius:4px;padding:1px 5px}
 
@@ -305,6 +310,24 @@ footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
 .lf-sig label:hover{border-color:var(--series-1)}
 .lf-sig i{font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums}
 
+/* ---- live stage rail ----
+   Each line is a real note from the enrichment trace, arriving as it is written.
+   Nothing here animates against an estimate: if a stage is slow, the dot sits and
+   pulses on the step that is actually slow. */
+.stages{margin:12px 0 4px 7px;border-left:2px solid var(--grid);padding-left:0}
+.stg{position:relative;padding:7px 0 7px 22px;font-size:12.5px;color:var(--ink-2);
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.45}
+.stg::before{content:"";position:absolute;left:-6px;top:12px;width:9px;height:9px;
+  border-radius:50%;background:var(--good);border:2px solid var(--surface-1)}
+.stg.now{color:var(--ink)}
+.stg.now::before{background:var(--series-1);animation:stgpulse 1.1s ease-in-out infinite}
+.stg.seam::before{background:var(--warning)}
+@keyframes stgpulse{
+  0%,100%{transform:scale(1);opacity:1}
+  50%{transform:scale(1.6);opacity:.5}
+}
+@media (prefers-reduced-motion:reduce){.stg.now::before{animation:none}}
+
 /* ---- reconciliation, gaps, pain points ---- */
 .recon{font-size:12.5px;margin:8px 0;padding:6px 10px;border-radius:5px;
   border-left:3px solid var(--border);background:var(--surface-2)}
@@ -373,7 +396,7 @@ footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
   flex:0 0 auto}
 .fsub{font-size:13px;color:var(--ink-2);margin-top:3px}
 .fnote{font-size:12.5px;color:var(--muted);margin-top:6px;padding-left:10px;
-  border-left:2px solid var(--grid);max-width:88ch}
+  border-left:2px solid var(--grid);max-width:96ch}
 .fnote b{color:var(--ink-2)}
 
 /* branch-offs: indented, so the eye reads them as leaving the spine */
@@ -941,6 +964,37 @@ function leadForm() {
       on the same person and watch the route change.</div>
     <div id="lf-out"></div>
   </section>`;
+}
+
+/* The live stage rail. Every line is a real note from the enrichment trace — the same
+   trace that gets stored on the lead — so what you watch during the lookup is the audit
+   log being written, not a narration of it. A stage that mentions a seam or a refusal
+   gets an amber dot rather than a green one, because those are the interesting ones. */
+function stageRail(stages, done) {
+  return `<div class="stages">${stages.map((s, i) => {
+    const live = !done && i === stages.length - 1;
+    const seam = /SEAM|refused|no LinkedIn profile|returned nothing|skipping paid/i.test(s);
+    return `<div class="stg ${live ? "now" : seam ? "seam" : ""}">${esc(s)}</div>`;
+  }).join("")}</div>`;
+}
+
+/* The lookup APPENDS to the run on screen, so the table below is stale by exactly one
+   row. Insert it at the top rather than re-rendering the tab, which would wipe the
+   result the person is reading. */
+function refreshLeadTable(lead) {
+  const head = $(".lhead");
+  if (!head) return;
+  const tmp = document.createElement("div");
+  tmp.innerHTML = leadCard(lead);
+  const row = tmp.firstElementChild;
+  if (!row) return;
+  row.classList.add("fresh");
+  head.after(row);
+  const flag = document.createElement("div");
+  flag.className = "freshnote";
+  flag.innerHTML = "↑ added to this run just now — the totals above still show the "
+                 + "batch, reload to recount";
+  row.after(flag);
 }
 
 function painPoints(l) {
@@ -1691,8 +1745,24 @@ document.addEventListener("click", async e => {
       return;
     }
     t.disabled = true; t.textContent = "Looking up…";
-    out.innerHTML = `<div class="empty">Serper → LinkedIn profile → company page →
-      reconcile → score → draft. About 20 seconds.</div>`;
+    out.innerHTML = `<div class="stages"><div class="stg now">starting the lookup…</div></div>`;
+
+    /* Poll the real trace while the POST is in flight. The endpoint is a sync
+       handler, so FastAPI serves it from a threadpool and /api/status stays
+       answerable — which is what makes this show the live stage rather than a
+       progress bar guessing at 20 seconds. */
+    let polling = true;
+    const tick = async () => {
+      if (!polling) return;
+      try {
+        const st = await api("/api/status");
+        const s = st.stages || [];
+        if (s.length) out.innerHTML = stageRail(s, false);
+      } catch (e) { /* a dropped poll is not worth surfacing */ }
+      if (polling) setTimeout(tick, 450);
+    };
+    tick();
+
     try {
       const body = {
         first_name: $("#lf-first").value, last_name: $("#lf-last").value, email,
@@ -1701,14 +1771,28 @@ document.addEventListener("click", async e => {
       const r = await api("/api/leads/one",
         { method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body) });
-      out.innerHTML = r.error
+      polling = false;
+      // The finished rail stays above the card: it is the audit trail of this exact
+      // lookup, and it is the most persuasive thing on the screen during a demo.
+      let rail = "";
+      try {
+        const st = await api("/api/status");
+        if ((st.stages || []).length) rail = stageRail(st.stages, true);
+      } catch (e) { /* ignore */ }
+      out.innerHTML = rail + (r.error
         ? `<div class="note warn"><b>Lookup failed.</b> ${esc(r.error)}</div>`
         // Opened, because you just asked for this one — the row you typed should not
         // need a second click to show what it found.
-        : (r.lead ? leadCard(r.lead, true) : '<div class="note warn">No lead returned.</div>');
+        : (r.lead ? leadCard(r.lead, true) : '<div class="note warn">No lead returned.</div>'));
+      // The lead was appended to the run already on screen, so the table below is
+      // now stale by exactly one row. Refresh it rather than leaving the person to
+      // wonder where their lead went.
+      if (!r.error && r.lead) setTimeout(() => refreshLeadTable(r.lead), 400);
     } catch (err) {
+      polling = false;
       out.innerHTML = `<div class="note warn">${esc(String(err))}</div>`;
     }
+    polling = false;
     t.disabled = false; t.textContent = "Find, score & draft";
     return;
   }
@@ -1718,16 +1802,37 @@ document.addEventListener("click", async e => {
     const q = $("#ah-q").value.trim();
     if (!q) return;
     t.disabled = true; t.textContent = "Asking…";
-    $("#ah-out").innerHTML = '<div class="empty">asking every enabled engine…</div>';
+    $("#ah-out").innerHTML = `<div class="stages"><div class="stg now">asking every enabled engine…</div></div>`;
+
+    // Same live rail as the lead lookup — one line per engine, as it answers.
+    let ahPoll = true;
+    const ahTick = async () => {
+      if (!ahPoll) return;
+      try {
+        const st = await api("/api/status");
+        if ((st.stages || []).length) $("#ah-out").innerHTML = stageRail(st.stages, false);
+      } catch (e) { /* ignore */ }
+      if (ahPoll) setTimeout(ahTick, 450);
+    };
+    ahTick();
+
     try {
       const r = await api("/api/adhoc",
         { method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query: q }) });
-      $("#ah-out").innerHTML = r.error
-        ? `<div class="note warn">${esc(r.error)}</div>` : adhocResults(r);
+      ahPoll = false;
+      let rail = "";
+      try {
+        const st = await api("/api/status");
+        if ((st.stages || []).length) rail = stageRail(st.stages, true);
+      } catch (e) { /* ignore */ }
+      $("#ah-out").innerHTML = rail + (r.error
+        ? `<div class="note warn">${esc(r.error)}</div>` : adhocResults(r));
     } catch (err) {
+      ahPoll = false;
       $("#ah-out").innerHTML = `<div class="note warn">${esc(String(err))}</div>`;
     }
+    ahPoll = false;
     t.disabled = false; t.textContent = "Ask";
     return;
   }

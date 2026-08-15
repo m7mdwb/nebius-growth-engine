@@ -12,7 +12,7 @@ not know. No slides, no one-pager on screen — the app, and one live lookup.
 |---|---|
 | **Server on current code** | `python -m uvicorn web.app:app --port 8011` — **drop `--reload` for the take.** A file save mid-run kills the background collection thread and takes the spend with it |
 | **Run picker on `run 3 · measured`** | If you left it on a seeded run, you open on invented data |
-| **Lead table shows five leads** | If you rehearsed a lookup, that lookup became the newest run. Press **Run lead engine** to restore the five, or re-run `python -m aeo.leads` |
+| **Lead table shows five leads** | A lookup now *appends* to the run on screen rather than replacing it, so rehearsals accumulate. If the table has your test rows in it, `python -m aeo.leads` starts a clean run of five |
 | **Rehearse the exact live lookup** | Same name, same email you will type on camera, ~$0.06. Do not discover on the take that the profile does not reconcile |
 | **Pick someone whose email domain matches their employer** | The reconciliation check is domain-based; a personal address will disqualify and a mismatched one routes to human review. Both are *good demos* if you mean them, and a bad surprise if you do not |
 | **Apify + Anthropic credit** | Both bill; check the balance |
@@ -50,11 +50,22 @@ per-market query sets, live ChatGPT/Perplexity keys, CRM write-back.
    it leaned on. A draft that cites nothing is a mail-merge in costume, and the dashboard
    counts those."*
 4. **Now type a real person live.** Name, surname, work email, tick **Booked a demo**.
-   While it runs (~20 seconds), narrate the waterfall: *"Serper finds the LinkedIn
-   profile, two Apify actors read the person and the company, and then the record is
-   reconciled against the email domain — because the top search hit for a common name is
-   a different real person often enough to matter, and an unreconciled record does not
-   score badly, it scores* well*, with every field looking complete."*
+   **Do not talk over the stage rail — let it run and read it.** Those lines are the
+   enrichment trace being written, streamed out as it happens:
+
+   ```
+   profile proposed: https://www.linkedin.com/in/arvindkrishna
+   person record from dev_fusion
+   company lookup: linkedin.com/company/ibm
+   reconciliation: verified — company website matches the email domain
+   scoring against config/leads.yaml
+   routed hot — inferring pain points and drafting
+   ```
+
+   Then narrate the one that matters: *"reconciliation verified — the scraped company's
+   website matches the email domain. That check is there because the top search hit for
+   a common name is a different real person often enough to matter, and an unreconciled
+   record does not score badly, it scores* well*, with every field looking complete."*
 5. When it lands: read the reconciliation verdict, the score, the route. **Then untick
    the demo box conceptually:** *"leave every behaviour box unticked and this lead cannot
    go hot however good the company is. That is the intent gate, and it is there because
@@ -100,8 +111,26 @@ One story here, and it is the best one in the repo:
    *"Same board, seeded data — and the banner says so, because the flag lives in the
    database row, not in a caption. This is what the tool looks like once placements land,
    and it is why the zero is a starting line rather than a dead end."* Click back.
-6. **The five recommendations**, briefly — they are written only from the evidence tables,
-   never from the raw answers.
+6. **Ask one live — this is the live Track C demo.** Scroll to **Ask an ad-hoc query**,
+   type a buyer question, and let the rail run (~30 seconds):
+
+   ```
+   asking Claude…
+   Claude: absent, 7 citation(s)
+   asking Google AI Overviews…
+   Google AI Overviews: absent, 3 citation(s)
+   ChatGPT: unmeasured — declared seam, never called
+   Perplexity: unmeasured — declared seam, never called
+   ```
+
+   Two things to say over it: *"that is live, right now, against the real engines — and
+   the two without keys say 'never called' rather than quietly reporting nothing."* And:
+   *"this is deliberately **not** saved. The ten queries are a fixed measurement
+   contract, and letting a curious one-off write into the same tables would corrupt
+   every comparison to date for the sake of one lookup. It runs, it renders, it's gone."*
+
+7. **The five recommendations**, briefly — written only from the evidence tables, never
+   from the raw answers.
 
 ## 5:30 – 6:20 · AEO logic — the argument in one screen
 

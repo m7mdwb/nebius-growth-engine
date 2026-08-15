@@ -32,7 +32,8 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 # Progress for the running collection. One run at a time by design — this is a
 # local tool, and a queue would be scaffolding nobody needs.
-_state: dict = {"running": False, "log": [], "step": 0, "steps": 0, "run_id": None}
+_state: dict = {"running": False, "log": [], "step": 0, "steps": 0, "run_id": None,
+                "stages": []}
 _lock = threading.Lock()
 
 
@@ -220,9 +221,22 @@ def api_adhoc(payload: dict) -> JSONResponse:
 
     cfg = config.load()
     out = []
+    with _lock:
+        _state["stages"] = []
     for name in [n for n in ENGINES if cfg.engine_enabled(n)]:
+        label = ENGINE_LABELS.get(name, name)
+        # Streamed to /api/status so the panel shows which engine is being asked right
+        # now. Same mechanism as the lead lookup: the stage on screen is the stage the
+        # code is on, so an engine that takes nine seconds visibly takes nine seconds.
+        with _lock:
+            _state["stages"].append(f"asking {label}…")
         res = ENGINES[name](q, cfg)
         obs = analyze.classify(res, cfg)
+        with _lock:
+            _state["stages"][-1] = (
+                f"{label}: {obs['status']}"
+                + (f", {len(obs['citations'])} citation(s)" if res.is_live else " — declared seam, never called")
+            )
         out.append({
             "engine": name, "label": ENGINE_LABELS.get(name, name),
             "live": bool(res.is_live), "status": obs["status"],
@@ -302,6 +316,8 @@ def api_status() -> JSONResponse:
             "steps": _state["steps"],
             "run_id": _state["run_id"],
             "log": _state["log"][-60:],
+            # The live enrichment trace for a single lookup — see api_lead_one.note().
+            "stages": _state.get("stages", []),
         })
 
 
@@ -411,7 +427,7 @@ def api_lead_one(payload: dict) -> JSONResponse:
     with _lock:
         if _state["running"]:
             return JSONResponse({"started": False, "reason": "a run is already going"})
-        _state.update(running=True, log=[], step=0, steps=1, run_id=None)
+        _state.update(running=True, log=[], step=0, steps=1, run_id=None, stages=[])
 
     def progress(ev: dict) -> None:
         with _lock:
@@ -420,8 +436,30 @@ def api_lead_one(payload: dict) -> JSONResponse:
             elif ev["event"] == "result":
                 _state["step"] = ev["step"]
 
+    def note(msg: str) -> None:
+        """The enrichment trace, streamed to /api/status while the lookup runs.
+
+        The form polls it, so the stage on screen is the stage the code is actually
+        on — not a bar animating against a guess at how long this takes.
+        """
+        with _lock:
+            _state["stages"].append(msg)
+
+    # 🔑 APPEND to the run already on screen instead of starting a new one. The
+    # dashboard reads the LATEST lead run, so a one-off lookup that opened its own run
+    # silently replaced the five samples with a table of one — the person typing lost
+    # the very context they were typing into. Only append when the fit definition
+    # matches: leads scored under different rules must not share a run, or the
+    # fit_hash stamped on it would describe some of its rows and not others.
+    fit = L.load_fit()
+    with db.session() as conn:
+        prev_id = db.latest_lead_run_id(conn)
+        prev = db.lead_run(conn, prev_id) if prev_id else None
+    append_to = prev_id if prev and prev.get("fit_hash") == fit.fit_hash else None
+
     try:
-        run_id = L.collect(on_progress=progress, samples=[lead])
+        run_id = L.collect(fit=fit, on_progress=progress, samples=[lead],
+                           run_id=append_to, on_note=note)
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"error": f"{type(exc).__name__}: {exc}"}, status_code=500)
     finally:
@@ -432,4 +470,6 @@ def api_lead_one(payload: dict) -> JSONResponse:
         rows = db.leads(conn, run_id)
     for r in rows:
         r["intent"] = L.intent_points(r["breakdown"])
-    return JSONResponse({"run_id": run_id, "lead": rows[0] if rows else None})
+    # The lead just processed is the LAST row written, not the first in the run.
+    return JSONResponse({"run_id": run_id, "appended": append_to is not None,
+                         "lead": rows[-1] if rows else None})

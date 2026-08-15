@@ -607,7 +607,7 @@ def draft(lead: dict, enriched: dict, breakdown: list[dict], routing: dict,
 # the pipeline
 # ---------------------------------------------------------------------------
 
-def process(lead: dict, fit: FitDefinition, budget: Budget, conn) -> dict:
+def process(lead: dict, fit: FitDefinition, budget: Budget, conn, on_note=None) -> dict:
     """One lead, end to end. `conn` is needed for the headcount snapshots.
 
     The ORDER of the gates is the design, and it is deliberate:
@@ -618,8 +618,10 @@ def process(lead: dict, fit: FitDefinition, budget: Budget, conn) -> dict:
     because a record that might belong to a different human must never reach the
     scorer — the whole point is that a wrong record scores *well*, not badly.
     """
-    rec = _enrich.enrich(lead, budget)
+    rec = _enrich.enrich(lead, budget, on_note=on_note)
     enriched = flatten(rec, fit)
+    if on_note:
+        on_note("scoring against config/leads.yaml")
     name = f"{lead.get('first_name','')} {lead.get('last_name','')}".strip()
 
     base = {
@@ -695,6 +697,8 @@ def process(lead: dict, fit: FitDefinition, budget: Budget, conn) -> dict:
            "headcount_growth": (f"{g['pct']:+.1f}% ({g['label']})" if g.get("known") else None)}
 
     # --- 5. the two things rules cannot do ---------------------------------
+    if on_note:
+        on_note(f"routed {routing['route']} — inferring pain points and drafting")
     d = draft(lead, enriched, breakdown, routing, fit, gaps)
     out["message"] = None if d.get("error") else \
         f"{d.get('subject','')}\n\n{d.get('message','')}".strip()
@@ -706,11 +710,22 @@ def process(lead: dict, fit: FitDefinition, budget: Budget, conn) -> dict:
 
 
 def collect(fit: FitDefinition | None = None, on_progress=None,
-            samples: list[dict] | None = None) -> int:
+            samples: list[dict] | None = None, run_id: int | None = None,
+            on_note=None) -> int:
     """Run leads through the pipeline and store the results.
 
     `samples` overrides the config list, which is how the web form submits a single
     lead through the identical code path — the form is not a second implementation.
+
+    `run_id` APPENDS to an existing run instead of starting a new one. That exists
+    because a one-off lookup used to create its own run, and since the dashboard reads
+    the *latest* run, typing one person in silently replaced the five samples on screen
+    with a table of one. A single lookup is not a new measurement campaign; it belongs
+    beside the batch that is already there. The caller decides, because appending only
+    makes sense when the fit definition has not changed underneath it.
+
+    `on_note` streams the enrichment trace out as it happens, so a caller can show
+    which stage is running rather than a spinner that says "about 20 seconds".
     """
     from . import db
 
@@ -720,13 +735,14 @@ def collect(fit: FitDefinition | None = None, on_progress=None,
     budget = fit.budget()
 
     with db.session() as conn:
-        run_id = db.start_lead_run(conn, fit_hash=fit.fit_hash)
+        if run_id is None:
+            run_id = db.start_lead_run(conn, fit_hash=fit.fit_hash)
         say({"event": "run_started", "run_id": run_id, "steps": len(rows)})
 
         for i, lead in enumerate(rows, 1):
             say({"event": "step", "step": i, "steps": len(rows), "email": lead["email"]})
             try:
-                row = process(lead, fit, budget, conn)
+                row = process(lead, fit, budget, conn, on_note=on_note)
             except BudgetExhausted as exc:
                 # ⚠️ Reported, never swallowed. A run that quietly processes four of
                 # five leads looks exactly like a run with four leads in it, and the
