@@ -153,10 +153,11 @@ def build(bench: dict, gap: dict, seo: dict, summary: dict, cfg: Config) -> dict
         gaps.append(f"{len(bench['unmeasured'])} of the {bench['out_of']} queries were "
                     f"NOT measured on this run ({', '.join(bench['unmeasured'])}) — they "
                     f"are excluded from the count, not scored as losses.")
-    seams = [e for e, v in (summary.get("by_engine") or {}).items() if not v.get("n")]
-    gaps.append("ChatGPT and Perplexity are declared seams on this account — no key. "
-                "Two of four surfaces are unmeasured, so the count reflects Claude and "
-                "Google AI Overviews only.")
+    measured_engines = sorted(summary.get("by_engine") or {})
+    gaps.append(
+        f"Only these surfaces returned anything: {', '.join(measured_engines) or 'none'}. "
+        "Any enabled engine not listed is a declared seam with no key, so the count "
+        "reflects the measured surfaces only — it is not a statement about the others.")
     if (seo.get("queries_compared") or 0) < 3:
         gaps.append(f"The SEO/AEO overlap is computed from only "
                     f"{seo.get('queries_compared', 0)} queries — too thin for a verdict.")

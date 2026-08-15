@@ -83,7 +83,8 @@ def _leads_payload(include_personal: bool = False) -> dict:
             "redacted": not include_personal}
 
 
-def build_payload(include_personal: bool = False) -> dict:
+def build_payload(include_personal: bool = False,
+                  with_recommendations: bool = False) -> dict:
     cfg = config.load()
     leads_payload = _leads_payload(include_personal)
     with db.session() as conn:
@@ -146,15 +147,29 @@ def build_payload(include_personal: bool = False) -> dict:
     seo_rows = [{"query_id": q, "cited_domains": sorted(cited_by_q.get(q, ())),
                  "serp_domains": sorted(v)} for q, v in serp_by_q.items() if v]
 
+    bench = analyze.benchmark(obs, cfg)
+    gap = analyze.source_gap(obs, cits, comps, cfg)
+    seo = analyze.seo_overlap(seo_rows)
+    summary = analyze.summarise(obs, cits, comps)
+
+    # Baked in at export time, because the standalone file has no server to ask and a
+    # "Generate" button over file:// would be a control that cannot work. Costs one
+    # model call, so it is opt-in.
+    recs = None
+    if with_recommendations:
+        from . import recommend
+        recs = recommend.build(bench, gap, seo, summary, cfg)
+
     return {
         "leads": leads_payload,
+        "recommendations": recs,
         "report": {
             "empty": False,
             "run": run,
-            "summary": analyze.summarise(obs, cits, comps),
-            "benchmark": analyze.benchmark(obs, cfg),
-            "source_gap": analyze.source_gap(obs, cits, comps, cfg),
-            "seo": analyze.seo_overlap(seo_rows),
+            "summary": summary,
+            "benchmark": bench,
+            "source_gap": gap,
+            "seo": seo,
             "grid": grid,
             "queries": [{"id": q.id, "text": q.text, "intent": q.intent,
                          "benchmark": q.benchmark} for q in cfg.queries],
@@ -168,12 +183,14 @@ def build_payload(include_personal: bool = False) -> dict:
     }
 
 
-def export(path: Path | None = None, include_personal: bool = False) -> Path:
+def export(path: Path | None = None, include_personal: bool = False,
+           with_recommendations: bool = False) -> Path:
     OUT.mkdir(parents=True, exist_ok=True)
     path = path or (OUT / "aeo_report.html")
 
     html = TEMPLATE.read_text(encoding="utf-8")
-    blob = json.dumps(build_payload(include_personal), ensure_ascii=False)
+    blob = json.dumps(build_payload(include_personal, with_recommendations),
+                      ensure_ascii=False)
     # </script> inside JSON would close the tag early.
     blob = blob.replace("</", "<\\/")
     html = html.replace(
@@ -193,8 +210,13 @@ if __name__ == "__main__":
         help="Embed scraped names, emails, profile URLs and drafted messages. OFF by "
              "default: this file is meant to be shared, and Track A holds real people. "
              "Only pass this for a local demo whose leads you know are public figures.")
+    ap.add_argument(
+        "--with-recommendations", action="store_true",
+        help="Also write the 3-5 AEO recommendations into the file. Costs one model "
+             "call. The standalone export has no server to generate them on demand.")
     a = ap.parse_args()
-    p = export(include_personal=a.include_personal)
+    p = export(include_personal=a.include_personal,
+               with_recommendations=a.with_recommendations)
     print(p)
     print("personal fields EMBEDDED — do not share this file"
           if a.include_personal else

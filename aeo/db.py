@@ -163,6 +163,20 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    # ⚠️ Both of these were learned by losing a run.
+    #
+    # A Track C collection is ~25 minutes of network calls that commits after every
+    # observation. Looking up one lead in the web app at the same time — which is a
+    # completely reasonable thing to do during a walkthrough — made the collector die
+    # with "database is locked" at step 12 of 80, throwing away everything after it and
+    # the money spent on it.
+    #
+    # SQLite's default busy timeout is ZERO: a writer that finds the database locked
+    # fails instantly rather than waiting the few milliseconds the other commit needs.
+    # WAL then lets readers carry on while a write is in flight, so the dashboard stays
+    # responsive during a collection instead of blocking on it.
+    conn.execute("PRAGMA busy_timeout = 15000")
+    conn.execute("PRAGMA journal_mode = WAL")
     return conn
 
 

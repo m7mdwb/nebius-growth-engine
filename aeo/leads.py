@@ -236,7 +236,15 @@ def disqualify(lead: dict, enriched: dict, fit: FitDefinition) -> str | None:
     d = fit.disq
     domain = enriched.get("domain", "")
 
-    if domain in {x.lower() for x in d.get("free_email_domains", [])}:
+    # ⚠️ The UNION of both lists, deliberately. `enrich.FREE_MAIL` is the list that
+    # decides whether to spend two paid calls; this one decides whether the lead is
+    # disqualified. They had drifted — gmx.de and web.de were in the first and not the
+    # second, so a German personal address skipped enrichment (correctly) and then
+    # routed `needs_review` instead of `disqualified`, because with nothing looked up
+    # there was nothing left to disqualify it on. The wrong branch, for a reason
+    # invisible from either file on its own.
+    free = {x.lower() for x in d.get("free_email_domains", [])} | _enrich.FREE_MAIL
+    if domain in free:
         return f"personal email domain ({domain}) — no company to sell a platform to"
 
     # Word-boundary matched — see _match(). A blocked role must be the word,

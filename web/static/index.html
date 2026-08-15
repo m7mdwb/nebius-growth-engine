@@ -622,7 +622,7 @@ function adhocResults(d) {
             `<span>${esc(c.domain)}</span>`).join("")}</div>` : ""}
     </div>`).join("")}
     <div class="note"><b>Not saved.</b> This answer is not in the database and does not
-      affect the ${"" + 10} of 10 count.</div>
+      affect the benchmark count above.</div>
   </div>`;
 }
 
@@ -657,8 +657,15 @@ function render(d, t) {
            s.competitors, "appearances", "name") +
     `</div>` +
     seoPanel(d.seo) +
-    recsPanel(null) +
-    adhocPanel() +
+    // In the standalone export there is no server to ask, so the recommendations are
+    // baked into the payload at export time. Rendering the "Generate" button there
+    // would ship a control that fetches an API over file:// and dies.
+    (EMBED ? (EMBED.recommendations ? `<section><h2>Recommendations</h2>
+        <p class="sub">Written from the measured evidence on this page — the benchmark,
+        the source gap and the overlap figure — at the time this file was exported.</p>
+        ${recsPanel(EMBED.recommendations)}</section>` : "")
+           : recsPanel(null)) +
+    (EMBED ? "" : adhocPanel()) +
     trend(t) +
     method(s, d) +
     (d.stale_contract

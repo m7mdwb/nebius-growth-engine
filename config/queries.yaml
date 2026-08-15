@@ -81,6 +81,19 @@ engines:
     enabled: true
     live: false         # SEAM — no key. Returns fixture data, flagged in the UI.
 
+# The written AEO recommendations (aeo/recommend.py). Opus, because this is the one
+# step that is pure judgement over a table of evidence — and the step whose output a
+# CMO actually reads.
+#
+# ⚠️ max_tokens was 3,000 and that truncated on a full run: five recommendations, each
+# with reasoning, an evidence list and a measurement, plus the SEO verdict, does not
+# fit. The failure now names itself ("hit max_tokens and was truncated") rather than
+# surfacing as "not valid JSON", which sent me looking for a schema bug that did not
+# exist. Generous on purpose — this runs once per run, not once per query.
+recommendations:
+  model: claude-opus-5
+  max_tokens: 8000
+
 run:
   # Repeats per query per engine. THIS IS THE POINT: LLM answers are
   # non-deterministic, so one sample is not a measurement. 3 is the demo setting;

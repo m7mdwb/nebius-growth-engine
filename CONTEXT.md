@@ -132,6 +132,42 @@ call per integration and prints PASS/FAIL with the actual data shape. Any integr
 that fails twice becomes a marked seam within 30 minutes and the build moves on — it
 does not get debugged into the deadline.
 
+## What it costs to run
+
+Measured, not estimated, on 2026-08-15.
+
+| | |
+|---|---|
+| One Track A lead | **~$0.025** — 1 Serper query + 2 Apify calls |
+| One full Track C run (80 steps) | **~$0.80–1.10** Anthropic + ~$0.20 Apify |
+| `scripts/probe.py`, all five | under five cents |
+| The written recommendations | one Opus call, a few cents |
+
+⚠️ **The scheduled workflow was daily and is now Mon/Wed/Fri.** At 80 steps with
+web-search charges, daily is roughly **$30/month on the personal Anthropic key** — the
+same key that hit its cap in July and silently cost two job assessments. Three runs a
+week still establishes a noise band, because what a baseline needs is a consistent query
+set over time rather than maximum frequency.
+
+⚠️ **The workflow also used to `git add -f data/aeo.db`** — force-committing the
+gitignored database on a schedule. That database now has a `leads` table. CI only runs
+Track C so it should always be empty, but "should be" is not a control: the job now
+fails loudly if it finds any lead rows before the commit step.
+
+## Two failures worth not re-learning
+
+**SQLite's default busy timeout is zero.** A Track C collection is ~25 minutes that
+commits after every observation. Looking up one lead in the web app at the same time —
+an entirely reasonable thing to do mid-walkthrough — killed the collector at step 12 of
+80 with `database is locked` and threw away the run and the money spent on it. Fixed
+with `PRAGMA busy_timeout = 15000` and WAL. **If this reappears, it is not a code bug,
+it is that pragma going missing.**
+
+**A truncated model response reports itself as a JSON error.** Both the lead draft and
+the recommendations hit `max_tokens` at different points, and the naive handler said
+"not valid JSON" — which sends you hunting for a schema bug that does not exist. Both
+now check `stop_reason` before parsing and say which failure it actually was.
+
 ## Known and settled — do not re-research
 
 - **Historic AEO data does not exist.** No API returns what an assistant said last month.

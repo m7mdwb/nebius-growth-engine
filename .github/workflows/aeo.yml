@@ -1,23 +1,27 @@
-name: AEO daily
+name: AEO scheduled
 
 # The "make it recurring" bonus. Measuring AI visibility once is a screenshot;
 # measuring it on a schedule against a frozen query set is a baseline, and the
 # baseline is the only thing that makes a later improvement legible.
 #
-# The database is committed back to the branch, so history accumulates in the
-# repo with no external storage. Fine at this volume; a real deployment would
-# push rows to a warehouse instead.
+# ⚠️ THIS RUNS TRACK C ONLY. Track A scrapes real people and must never run
+# unattended on a shared runner — see the guard before the commit step.
 
 on:
   schedule:
-    - cron: "0 6 * * *"      # 06:00 UTC daily
+    # Mon/Wed/Fri, not daily. A full run is 80 steps with web-search tool charges,
+    # roughly $0.80-1.10 of Anthropic plus a little Apify, so daily is ~$30/month on a
+    # personal key. Three times a week still establishes a noise band — what a baseline
+    # needs is a consistent query set over time, not maximum frequency — at 40% of the
+    # cost. Raise it once there is something to detect.
+    - cron: "0 6 * * 1,3,5"
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: aeo-daily
+  group: aeo-scheduled
   cancel-in-progress: false
 
 jobs:
@@ -41,6 +45,8 @@ jobs:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
         run: python -m aeo.run --label scheduled
 
+      # Redacted by default. Track A rows should not exist here at all (see the guard
+      # below), but the export defends itself rather than trusting that.
       - name: Export standalone report
         run: python -m aeo.report
 
@@ -49,6 +55,32 @@ jobs:
           name: aeo-report
           path: out/aeo_report.html
           retention-days: 30
+
+      # 🔑 CONSTRAINT 4, enforced rather than assumed.
+      #
+      # The step below force-adds a gitignored database, and that database has a
+      # `leads` table that can hold scraped names, work emails, LinkedIn URLs and
+      # drafted messages. Committing it would publish real people's data into the
+      # repository on a schedule — quietly, correctly, every Monday.
+      #
+      # CI only ever runs Track C, so the table should be empty. "Should be" is not a
+      # control. This fails the job loudly if it is not.
+      - name: Refuse to commit if any personal data is present
+        run: |
+          n=$(python -c "
+          import sqlite3
+          c = sqlite3.connect('data/aeo.db')
+          try:
+              print(c.execute('SELECT COUNT(*) FROM leads').fetchone()[0])
+          except sqlite3.OperationalError:
+              print(0)
+          ")
+          echo "leads rows: $n"
+          if [ "$n" != "0" ]; then
+            echo "::error::data/aeo.db contains $n lead row(s). Track A scrapes real"
+            echo "::error::people and this file is about to be committed. Refusing."
+            exit 1
+          fi
 
       - name: Commit the day's rows
         run: |
