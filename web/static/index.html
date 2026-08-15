@@ -128,6 +128,40 @@ svg{display:block;width:100%;height:auto;overflow:visible}
 .tabs button.on{color:var(--ink);border-bottom-color:var(--series-1)}
 .tabs button:hover:not(:disabled){background:none;color:var(--ink)}
 
+/* ---- lead table: a row per lead, expanding to the full record ----
+   <details>/<summary> rather than a JS accordion, so it keeps working in the
+   standalone export where there is no server and no state to restore. */
+.lhead{display:grid;grid-template-columns:1fr 74px 66px 126px;gap:10px;
+  padding:0 14px 7px;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted)}
+.lhead span:not(:first-child){text-align:right}
+.lrow{border:1px solid var(--border);border-radius:9px;margin-bottom:6px;
+  background:var(--surface-1)}
+.lrow[open]{border-color:var(--axis)}
+.lrow>summary{display:grid;grid-template-columns:1fr 74px 66px 126px;gap:10px;
+  align-items:center;padding:11px 14px;cursor:pointer;list-style:none}
+.lrow>summary::-webkit-details-marker{display:none}
+.lrow>summary:hover{background:var(--surface-2);border-radius:8px}
+.lrow>summary:focus-visible{outline:2px solid var(--series-1);outline-offset:-2px}
+.lr-who{min-width:0}
+.lr-who b{font-size:14px;font-weight:700}
+.lr-who b::before{content:"▸";display:inline-block;color:var(--muted);font-weight:400;
+  margin-right:8px;transition:transform .15s}
+.lrow[open] .lr-who b::before{transform:rotate(90deg)}
+.lr-who span{display:block;font-size:12px;color:var(--muted);margin:2px 0 0 17px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lr-sc{text-align:right;font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.lr-sc small{font-size:10.5px;color:var(--muted);font-weight:400}
+.lr-int{text-align:right;font-size:12.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.lr-route{text-align:right}
+.lr-body{padding:4px 15px 14px;margin-top:3px;border-top:1px solid var(--grid)}
+.lr-meta{font-size:12px;color:var(--muted);margin:10px 0 2px}
+@media(max-width:760px){
+  .lhead{display:none}
+  .lrow>summary{grid-template-columns:1fr auto;row-gap:6px}
+  .lr-int{display:none}
+}
+
 /* ---- lead cards ---- */
 .lead{border:1px solid var(--border);border-radius:9px;padding:14px 16px;margin-bottom:10px;background:var(--surface-1)}
 .lead-head{display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;justify-content:space-between;margin-bottom:9px}
@@ -910,7 +944,11 @@ function painPoints(l) {
   </div>`;
 }
 
-function leadCard(l) {
+/* One lead as a table row that opens into the full record.
+   ⚠️ `open` is an explicit named argument and callers must not pass this straight
+   to .map() — map hands the index in as the second argument, which would collapse
+   the first lead and expand every other one. */
+function leadCard(l, open) {
   const bd = (l.breakdown || []).map(r =>
     `<span>${esc(r.factor)}: ${esc(r.detail)} <b>+${r.points}</b></span>`).join("");
 
@@ -936,26 +974,35 @@ function leadCard(l) {
   const growth = l.headcount_growth
     ? ` · headcount ${esc(l.headcount_growth)}` : "";
 
-  return `<div class="lead">
-    <div class="lead-head">
-      <div class="lead-who">
+  /* The summary is the table row: who, what they scored, whether they did anything,
+     and where they went. Everything that justifies those four things is inside. */
+  return `<details class="lrow"${open ? " open" : ""}>
+    <summary>
+      <span class="lr-who">
         <b>${esc(l.name || l.email)}</b>
-        ${l.linkedin_url ? `<a class="li" href="${esc(l.linkedin_url)}" target="_blank" rel="noopener">profile ↗</a>` : ""}
-        <span>${esc(l.title || "—")}${l.company ? " · " + esc(l.company) : ""}
-          ${l.headcount ? " · " + l.headcount.toLocaleString() + " staff" : ""}${growth} · ${esc(l.email)}</span>
-      </div>
-      <div class="lead-right">
-        ${l.score != null ? `<div class="score">${l.score} <small>pts · intent ${l.intent == null ? "—" : l.intent}</small></div>` : ""}
+        <span>${esc(l.title || "no title found")}${l.company ? " · " + esc(l.company) : ""}${
+          l.headcount ? " · " + l.headcount.toLocaleString() + " staff" : ""}</span>
+      </span>
+      <span class="lr-sc">${l.score != null ? l.score : "—"} <small>pts</small></span>
+      <!-- A lead that never reached the scorer has no intent READING, and "int 0"
+           would state one. Disqualified and needs_review stop before scoring, so
+           they get a dash — same rule the gaps and the seams follow. -->
+      <span class="lr-int">${l.score == null || l.intent == null ? "—" : "int " + l.intent}</span>
+      <span class="lr-route">
         <span class="pill r-${esc(l.route)}">${esc(ROUTE_LABEL[l.route] || l.route)}</span>
-      </div>
+      </span>
+    </summary>
+    <div class="lr-body">
+      <div class="lr-meta">${esc(l.email)}${growth}
+        ${l.linkedin_url ? `<a class="li" href="${esc(l.linkedin_url)}" target="_blank" rel="noopener">profile ↗</a>` : ""}</div>
+      ${rec}
+      ${bd ? `<div class="bd">${bd}</div>` : ""}
+      ${gaps}
+      <div class="why">${esc(l.disqualified || l.route_why || "")}</div>
+      ${painPoints(l)}
+      ${draft}
     </div>
-    ${rec}
-    ${bd ? `<div class="bd">${bd}</div>` : ""}
-    ${gaps}
-    <div class="why">${esc(l.disqualified || l.route_why || "")}</div>
-    ${painPoints(l)}
-    ${draft}
-  </div>`;
+  </details>`;
 }
 
 function scoringMethod(m) {
@@ -1076,7 +1123,8 @@ function renderLeads(d) {
         returns a confident number it can't reproduce twice and nobody can audit. Every
         point below shows where it came from.</p>
       ${genericWarn}
-      ${d.leads.map(leadCard).join("")}
+      <div class="lhead"><span>Lead</span><span>Fit</span><span>Intent</span><span>Route</span></div>
+      ${d.leads.map(l => leadCard(l)).join("")}
       <div class="note"><b>Every weight behind those points is on the
         <i>Track A · Logic</i> tab</b> — the bands, the seniority tiers, the routing
         thresholds and the enrichment waterfall, all read live from
@@ -1583,7 +1631,9 @@ document.addEventListener("click", async e => {
           body: JSON.stringify(body) });
       out.innerHTML = r.error
         ? `<div class="note warn"><b>Lookup failed.</b> ${esc(r.error)}</div>`
-        : (r.lead ? leadCard(r.lead) : '<div class="note warn">No lead returned.</div>');
+        // Opened, because you just asked for this one — the row you typed should not
+        // need a second click to show what it found.
+        : (r.lead ? leadCard(r.lead, true) : '<div class="note warn">No lead returned.</div>');
     } catch (err) {
       out.innerHTML = `<div class="note warn">${esc(String(err))}</div>`;
     }
