@@ -787,3 +787,42 @@ def summarise(rows: list[dict]) -> dict:
         "with_gaps": sum(1 for r in rows if r.get("gaps")),
         "growth_measured": sum(1 for r in rows if r.get("headcount_growth")),
     }
+
+
+def main() -> int:
+    """`python -m aeo.leads` — run the sample batch from the command line.
+
+    The dashboard button and the lookup form both call `collect()`; this is the same
+    entry point for someone who cloned the repo and would rather not start a server
+    to see whether it works.
+    """
+    import argparse
+    from . import db
+
+    ap = argparse.ArgumentParser(description="Run the sample leads end to end.")
+    ap.add_argument("--limit", type=int, help="process only the first N samples")
+    args = ap.parse_args()
+
+    fit = load_fit()
+    rows = fit.samples[: args.limit] if args.limit else None
+
+    def echo(ev: dict) -> None:
+        if ev["event"] == "result":
+            print(f"  [{ev['step']:>2}/{ev['steps']}] {ev['email']:<34} "
+                  f"{str(ev['score']):>5} pts  {ev['route']:<13}"
+                  f"{'drafted' if ev['drafted'] else ''}", flush=True)
+
+    run_id = collect(fit=fit, on_progress=echo, samples=rows)
+
+    with db.session() as conn:
+        out = db.leads(conn, run_id)
+    s = summarise(out)
+    print(f"\ndone. lead_run={run_id}  fit_hash={fit.fit_hash}")
+    print(f"routes: {s['routes']}")
+    print(f"anthropic cost: ${s['cost_usd']:.4f}  ·  generic drafts: {s['generic_drafts']}")
+    print("dashboard:  uvicorn web.app:app --reload   ->  http://127.0.0.1:8000")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

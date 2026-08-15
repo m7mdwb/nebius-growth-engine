@@ -12,6 +12,7 @@ is present and falls back to the API when it is not.
 from __future__ import annotations
 
 import json
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -45,13 +46,48 @@ OUT = ROOT / "out"
 _PERSONAL = ("name", "email", "linkedin_url", "message", "trace")
 
 
+def _scrub(text: str, tokens: list[str]) -> str:
+    """Remove a person's name from free text the MODEL wrote.
+
+    ⚠️ Found by a leak check on the shipped file, not by reading the code. Redacting
+    the structured fields is not enough, because `pain_points` is generated prose and
+    the model naturally writes the person into it — "as CEO Klein carries the gap
+    between what SAP promises on stage and what its people can deliver". Every
+    identifying FIELD was masked and a real surname still shipped, inside the one
+    field nobody thought of as personal data.
+
+    The pain points themselves are about the COMPANY and are worth keeping — they are
+    the most interesting thing on the card — so the name comes out and the analysis
+    stays.
+    """
+    out = text or ""
+    for t in tokens:
+        t = (t or "").strip()
+        if len(t) < 3:          # initials and particles would match everywhere
+            continue
+        out = re.sub(rf"\b{re.escape(t)}\b", "—", out, flags=re.IGNORECASE)
+    return out
+
+
 def _redact(row: dict) -> dict:
     out = dict(row)
     email = row.get("email") or ""
     domain = email.split("@")[-1] if "@" in email else ""
+    # Built BEFORE the name is overwritten, and including the email local part, which
+    # is very often the name in another shape (christian.klein@).
+    tokens = [p for p in re.split(r"[\s.._-]+", f"{row.get('name') or ''} "
+                                  f"{email.split('@')[0]}") if p]
     out["name"] = "— redacted —"
     out["email"] = f"•••@{domain}" if domain else "— redacted —"
     out["linkedin_url"] = None
+    out["pain_points"] = [
+        {**p, "pain": _scrub(p.get("pain", ""), tokens),
+         "evidence": _scrub(p.get("evidence", ""), tokens)}
+        for p in (row.get("pain_points") or [])
+    ]
+    out["evidence"] = [_scrub(e, tokens) for e in (row.get("evidence") or [])]
+    out["route_why"] = _scrub(row.get("route_why") or "", tokens)
+    out["disqualified"] = _scrub(row.get("disqualified") or "", tokens) or None
     # The draft is the single most identifying field: it is addressed to them by name
     # and quotes their record back. The COUNT of facts it cited survives, which is what
     # the "is this a mail-merge" check actually needs.

@@ -20,27 +20,53 @@ the data, not just in a caption.
 
 ## Run it
 
-```bash
-pip install -r requirements.txt
-cp .env.example .env          # ANTHROPIC_API_KEY, APIFY_TOKEN, SERPER_API_KEY
+### Nothing to install, nothing to sign up for — 10 seconds
 
-python scripts/probe.py                     # FIRST. one call per integration, PASS/FAIL
-uvicorn web.app:app --reload                # http://127.0.0.1:8000
+Open **[`docs/standalone_report.html`](docs/standalone_report.html)** — download it and
+double-click. One self-contained file with the data baked in: no server, no keys, no
+Python. All four tabs work. Personal fields are redacted, because Track A scrapes real
+people and this file is meant to be shared (see *Constraint 4* below).
+
+### Run the app itself, without any keys — 60 seconds
+
+```bash
+pip install -r requirements.txt              # Python 3.11+
+python scripts/seed_synthetic.py --weeks 3   # marked backfill, so the board has data
+python scripts/seed_synthetic.py --snapshots # marked prior headcount, so growth computes
+uvicorn web.app:app --reload                 # http://127.0.0.1:8000
 ```
 
-Then press **Run live collection** (Track C) or **Run lead engine** (Track A), or type a
-real person into the Track A form.
+⚠️ **Do the seed step.** A fresh clone has no database, so without it every tab renders
+an honest but unhelpful *"No runs yet"*. The seeded runs are flagged `is_synthetic = 1`
+**in the data**, so the dashboard puts a red banner across the top rather than letting
+invented history read as measurement — that flag is a feature of the tool, not a caveat
+in this README.
+
+### Run it live, against real APIs
+
+```bash
+cp .env.example .env          # ANTHROPIC_API_KEY, APIFY_TOKEN, SERPER_API_KEY
+
+python scripts/probe.py       # FIRST. one call per integration, PASS/FAIL + data shape
+uvicorn web.app:app --reload
+```
+
+Then press **Run live collection** (AI visibility) or **Run lead engine** (Inbound
+leads), or type a real person's name and work email into the lead form and watch it
+find them. A lead lookup costs about $0.06; a full Track C collection about $3.10.
+
+**No keys?** It still runs. Every engine degrades to a declared seam and the dashboard
+draws it as a seam — which is the point.
+
+### The rest of the commands
 
 ```bash
 python -m aeo.run                     # one full collection (12 queries)
 python -m aeo.run --limit 3           # a few cents, for when you're changing things
-python -m aeo.report                  # -> out/aeo_report.html, one file, no server
-python scripts/seed_synthetic.py --weeks 3     # marked backfill, so the trend has a shape
-python scripts/seed_synthetic.py --snapshots   # marked prior headcount, so growth computes
+python -m aeo.report --with-recommendations   # -> out/aeo_report.html, one file, no server
+python -m aeo.leads                   # the 5 sample leads, end to end
+python scripts/fix_errored_status.py --dry-run  # one-off data correction, see its docstring
 ```
-
-**No keys?** It still runs. Every engine degrades to a declared seam and the dashboard
-draws them as seams — which is the point.
 
 ---
 
