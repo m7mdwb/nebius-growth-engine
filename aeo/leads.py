@@ -90,6 +90,31 @@ class FitDefinition:
             apify_usd_per_call=Decimal(str(caps.get("apify_usd_per_call", "0.10"))),
         )
 
+    @property
+    def max_points(self) -> dict:
+        """The ceiling, derived from the same config the scorer reads.
+
+        A score with no denominator is a number nobody outside the team can read:
+        144 is meaningless until you know whether the top is 150 or 1,500. Computed
+        rather than written down, so it cannot drift from the weights — the same
+        reason the method tables are rendered from this file instead of documented
+        beside it.
+
+        `fit` and `intent` are kept apart because the routing gates are separate:
+        firmographics alone cannot open the sales lane however high they go.
+        """
+        icp = self.icp
+        top = lambda rows: max((int(r.get("points", 0)) for r in rows), default=0)  # noqa: E731
+        hc = top(icp["headcount"]["bands"])
+        growth = top((icp.get("headcount_growth") or {}).get("bands") or [])
+        sen, fn, ind = top(icp["seniority"]), top(icp["function"]), top(icp["industry"])
+        # Summed, not maxed: the signals are independent events and one lead can
+        # genuinely fire several — that IS the top of the range, however rare.
+        intent = sum(int(r.get("points", 0)) for r in icp["intent"])
+        fit = hc + growth + sen + fn + ind
+        return {"headcount": hc, "growth": growth, "seniority": sen, "function": fn,
+                "industry": ind, "fit": fit, "intent": intent, "total": fit + intent}
+
     def method(self) -> dict:
         """Everything needed to explain the design, straight from the config.
 
@@ -99,7 +124,7 @@ class FitDefinition:
         """
         return {"icp": self.icp, "disqualifiers": self.disq,
                 "routing": self.routing, "enrichment": self.enrichment,
-                "fit_hash": self.fit_hash}
+                "max_points": self.max_points, "fit_hash": self.fit_hash}
 
     @property
     def fit_hash(self) -> str:

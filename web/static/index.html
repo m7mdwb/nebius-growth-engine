@@ -920,7 +920,13 @@ function leadForm() {
       <button id="lf-go" class="primary">Find, score &amp; draft</button>
     </div>
     <div class="lf-sig">
-      <span class="lf-lbl">First-party behaviour (optional, and this is what decides hot):</span>
+      <span class="lf-lbl">First-party behaviour — <b>these belong to the lead, not to this
+        form</b>. In production they arrive attached to the capture itself: the AI Readiness
+        Assessment posts <code>completed_assessment</code> with the score, the webinar platform
+        posts attended-or-not, the site posts the pricing visit. They are checkboxes here only
+        because we have no access to those systems — in the sample batch below they ride in the
+        lead record exactly as they would in production, and only a lead typed in cold needs
+        them set by hand.</span>
       ${SIGNALS.map(([k, label, pts]) =>
         `<label><input type="checkbox" value="${k}"> ${esc(label)} <i>+${pts}</i></label>`).join("")}
     </div>
@@ -983,11 +989,11 @@ function leadCard(l, open) {
         <span>${esc(l.title || "no title found")}${l.company ? " · " + esc(l.company) : ""}${
           l.headcount ? " · " + l.headcount.toLocaleString() + " staff" : ""}</span>
       </span>
-      <span class="lr-sc">${l.score != null ? l.score : "—"} <small>pts</small></span>
+      <span class="lr-sc">${l.score != null ? l.score : "—"}</span>
       <!-- A lead that never reached the scorer has no intent READING, and "int 0"
            would state one. Disqualified and needs_review stop before scoring, so
            they get a dash — same rule the gaps and the seams follow. -->
-      <span class="lr-int">${l.score == null || l.intent == null ? "—" : "int " + l.intent}</span>
+      <span class="lr-int">${l.score == null || l.intent == null ? "—" : l.intent}</span>
       <span class="lr-route">
         <span class="pill r-${esc(l.route)}">${esc(ROUTE_LABEL[l.route] || l.route)}</span>
       </span>
@@ -1098,6 +1104,10 @@ function enrichmentMethod(m) {
 
 function renderLeads(d) {
   const s = d.summary;
+  /* The ceiling, computed from leads.yaml rather than written down here — a score
+     with no denominator is unreadable to anyone outside the team, since 144 means
+     nothing until you know whether the top is 150 or 1,500. */
+  const mx = (d.method && d.method.max_points) || {};
   const genericWarn = s.generic_drafts
     ? `<div class="note warn"><b>${s.generic_drafts} draft(s) cited no specific fact.</b>
        That is a mail-merge with a name in it. The model is asked to declare which
@@ -1122,8 +1132,16 @@ function renderLeads(d) {
         <code>config/leads.yaml</code>, because a model asked to score a lead out of 100
         returns a confident number it can't reproduce twice and nobody can audit. Every
         point below shows where it came from.</p>
+      ${mx.total ? `<div class="note"><b>The top of the range is ${mx.total}</b> —
+        ${mx.fit} from firmographics (company size, growth, seniority, function,
+        industry) and ${mx.intent} from behaviour. <b>Both gates are separate:</b> hot
+        needs ${(d.routing || []).find(r => r.route === "hot")?.min_score ?? 70}+ total
+        <i>and</i> ${(d.routing || []).find(r => r.route === "hot")?.min_intent ?? 25}+
+        of that from intent, so a perfect ${mx.fit} on firmographics alone still cannot
+        reach sales. Nobody realistically scores ${mx.total}: it needs every behavioural
+        signal to have fired at once.</div>` : ""}
       ${genericWarn}
-      <div class="lhead"><span>Lead</span><span>Fit</span><span>Intent</span><span>Route</span></div>
+      <div class="lhead"><span>Lead</span><span>Score${mx.total ? ` / ${mx.total}` : ""}</span><span>Intent${mx.intent ? ` / ${mx.intent}` : ""}</span><span>Route</span></div>
       ${d.leads.map(l => leadCard(l)).join("")}
       <div class="note"><b>Every weight behind those points is on the
         <i>Track A · Logic</i> tab</b> — the bands, the seniority tiers, the routing
