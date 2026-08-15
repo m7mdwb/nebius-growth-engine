@@ -64,7 +64,12 @@ engines:
     enabled: true
     live: true
     model: claude-sonnet-5
-    max_tokens: 2000
+    # ⚠️ Was 2000 and that was measurably too low — answers ended mid-sentence on
+    # `max_tokens`, and a truncated answer under-reports every brand named after the
+    # cut. That is a silent bias toward `absent`, i.e. toward flattering ourselves
+    # about competitors and unflattering about our own presence, in an instrument whose
+    # entire job is counting who gets named. Truncation is now also flagged per answer.
+    max_tokens: 4000
   ai_overviews:
     enabled: true
     live: true          # via Apify; falls back to a marked seam if APIFY_TOKEN is absent
@@ -86,60 +91,87 @@ run:
   repeat_subset: 4
   locale: en-US
 
+# =========================================================================
+# THE BENCHMARK — exactly ten buyer-intent queries.
+# =========================================================================
+#
+# Reported as a COUNT, never a percentage: "we appear in 3 of 10". Target is 10 of 10.
+#
+# 🔑 Why a count and not a rate. A percentage invites a denominator nobody checks —
+# 30% could be 3 of 10 or 3 of 10 with four cells unmeasured, and the second is not a
+# result. Ten named queries you can read down the page is a number a CMO can argue
+# with. It also makes the target concrete: not "improve visibility 20%", but "we lose
+# these seven specific questions, here is who wins them instead".
+#
+# ⚠️ BRANDED QUERIES ARE NOT IN THE TEN. They sit below as `benchmark: false` controls.
+# "What is Nebius Academy" returns Nebius Academy, so including branded queries in the
+# headline count inflates it for free and makes 10 of 10 reachable without winning a
+# single buyer question. They are still worth asking — if we ever lose our own name,
+# nothing else on this page matters — but they are a sanity check, not the score.
+#
+# The ten below are the questions an enterprise L&D or transformation lead actually
+# types before they know any vendor's name. Three shapes, deliberately mixed:
+#   category   — high commercial intent, hardest to win, most contested
+#   problem    — asked BEFORE the buyer knows a vendor category exists; cheapest to win
+#   assessment — Skillcheck's territory specifically
+#   buying     — late funnel, high intent, low competition, usually neglected
 queries:
   # --- Category. Highest commercial intent, hardest to win. ---
   - id: q01
     text: best AI readiness training for enterprises
     intent: category
+    benchmark: true
   - id: q02
     text: best corporate AI upskilling programs
     intent: category
+    benchmark: true
   - id: q03
     text: enterprise AI training providers
     intent: category
+    benchmark: true
 
   # --- Problem-shaped. Asked before the buyer knows any vendor exists. ---
   - id: q04
     text: how do we upskill our team on AI
     intent: problem
+    benchmark: true
   - id: q05
     text: our employees aren't using AI, where do we start
     intent: problem
+    benchmark: true
   - id: q06
     text: how to build an AI adoption program for a 500-person company
     intent: problem
+    benchmark: true
 
   # --- Comparison. The buyer already has a shortlist; are we on it? ---
   - id: q07
-    text: Coursera vs Udemy for enterprise AI training
-    intent: comparison
-  - id: q08
     text: build vs buy AI training for employees
     intent: comparison
-  - id: q09
-    text: alternatives to enterprise AI bootcamps
-    intent: comparison
+    benchmark: true
 
   # --- Assessment. Skillcheck's territory. ---
-  - id: q10
+  - id: q08
     text: AI skills assessment tools for enterprises
     intent: assessment
-  - id: q11
+    benchmark: true
+  - id: q09
     text: how to measure employee AI readiness
     intent: assessment
+    benchmark: true
 
   # --- Buying process. Late funnel, high intent, low competition. ---
-  - id: q12
+  - id: q10
     text: how much does corporate AI training cost
     intent: buying
-  - id: q13
-    text: what should an enterprise AI training RFP include
-    intent: buying
+    benchmark: true
 
-  # --- Branded controls. If we lose these, nothing else matters. ---
-  - id: q14
-    text: Nebius Academy reviews
-    intent: branded
-  - id: q15
+  # --- Controls. Asked and reported, but NOT part of the ten. ---
+  - id: c01
     text: what is Nebius Academy
     intent: branded
+    benchmark: false
+  - id: c02
+    text: Nebius Academy reviews
+    intent: branded
+    benchmark: false

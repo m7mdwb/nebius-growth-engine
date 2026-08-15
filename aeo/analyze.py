@@ -87,7 +87,7 @@ def classify(result: EngineResult, cfg: Config) -> dict:
         return {
             "status": UNMEASURED, "brand_rank": None, "products": [],
             "answer_chars": 0, "answer_excerpt": None,
-            "citations": [], "competitors": [],
+            "citations": [], "competitors": [], "serp_domains": [],
             "error": result.error, "note": result.note,
         }
 
@@ -165,6 +165,7 @@ def classify(result: EngineResult, cfg: Config) -> dict:
             for c in result.citations
         ],
         "competitors": competitors,
+        "serp_domains": [s["domain"] for s in (result.serp or []) if s.get("domain")],
         "error": result.error,
         "note": result.note,
     }
@@ -240,4 +241,236 @@ def summarise(observations: list[dict], citations: list[dict],
             "unstable_cells": unstable,
             "unstable_pct": round(100 * unstable / repeated, 1) if repeated else 0.0,
         },
+    }
+
+
+# ---------------------------------------------------------------------------
+# The benchmark: "we appear in N of 10". A COUNT, never a percentage.
+# ---------------------------------------------------------------------------
+
+def benchmark(observations: list[dict], cfg: Config) -> dict:
+    """Ten named queries, each won or lost, and the score is how many we won.
+
+    🔑 Why a count rather than a rate. A percentage hides its denominator, and the
+    denominator is where these dashboards lie: 30% reads the same whether it is 3 of
+    10 measured or 3 of 10 with four cells never looked at. A count forces the
+    denominator onto the page. It also turns the target from "improve visibility" —
+    which nobody can action — into "we lose these seven specific questions, and here
+    is who wins them instead", which someone can pick up on Monday.
+
+    ⚠️ Branded queries are excluded. `benchmark: false` in queries.yaml. Asking "what
+    is Nebius Academy" and counting the answer as a win is free marks.
+
+    A query counts as WON if any engine cited or mentioned us on any repeat. That is
+    deliberately generous: the point of the headline number is "did we show up at all
+    anywhere", and the cited-vs-mentioned distinction is carried in the detail rows
+    where it can be acted on rather than being averaged into the top line.
+    """
+    ids = [q.id for q in cfg.queries if getattr(q, "benchmark", True)]
+    by_q: dict[str, list[dict]] = defaultdict(list)
+    for o in observations:
+        if o["query_id"] in ids:
+            by_q[o["query_id"]].append(o)
+
+    rows = []
+    for q in cfg.queries:
+        if not getattr(q, "benchmark", True):
+            continue
+        obs = by_q.get(q.id, [])
+        live = [o for o in obs if o.get("is_live") and not o.get("error")]
+        statuses = {o["status"] for o in live}
+        if not live:
+            state = UNMEASURED      # never counted as a loss
+        elif CITED in statuses:
+            state = CITED
+        elif MENTIONED in statuses:
+            state = MENTIONED
+        else:
+            state = ABSENT
+        rows.append({
+            "query_id": q.id, "query": q.text, "intent": q.intent, "state": state,
+            "won": state in (CITED, MENTIONED),
+            "engines_measured": len({o["engine"] for o in live}),
+        })
+
+    measured = [r for r in rows if r["state"] != UNMEASURED]
+    won = [r for r in measured if r["won"]]
+    return {
+        "appear_in": len(won),
+        "out_of": len(rows),
+        "measured": len(measured),
+        # Unmeasured queries are named, not folded into the denominator. If two of
+        # ten were never asked, "3 of 10" is a different claim from "3 of 8" and the
+        # reader is entitled to know which.
+        "unmeasured": [r["query_id"] for r in rows if r["state"] == UNMEASURED],
+        "cited": sum(1 for r in measured if r["state"] == CITED),
+        "mentioned": sum(1 for r in measured if r["state"] == MENTIONED),
+        "target": len(rows),
+        "rows": rows,
+        "lost": [r for r in measured if not r["won"]],
+    }
+
+
+# ---------------------------------------------------------------------------
+# The source gap: what the answers cite where we lose, and what kind of thing it is
+# ---------------------------------------------------------------------------
+
+# Deterministic classification. The MODEL does not decide what kind of source
+# something is — that is a lookup, and a lookup that changes its mind between runs
+# would make the recommendations unreproducible. Same rule as Track A's scoring.
+_REVIEW_PLATFORMS = {
+    "g2.com", "capterra.com", "trustradius.com", "trustpilot.com", "gartner.com",
+    "softwareadvice.com", "sourceforge.net", "getapp.com", "peerspot.com",
+    "clutch.co", "coursereport.com", "switchup.org", "producthunt.com",
+}
+_COMMUNITY = {"reddit.com", "quora.com", "news.ycombinator.com", "stackoverflow.com",
+              "stackexchange.com", "x.com", "twitter.com", "linkedin.com"}
+_MAJOR_PUBLISHERS = {
+    "forbes.com", "techcrunch.com", "hbr.org", "mckinsey.com", "bcg.com",
+    "deloitte.com", "pwc.com", "ey.com", "accenture.com", "gartner.com",
+    "wired.com", "ft.com", "economist.com", "wsj.com", "bloomberg.com",
+    "venturebeat.com", "zdnet.com", "cio.com", "computerworld.com",
+}
+
+SOURCE_KINDS = {
+    "owned": "Our own domains",
+    "review_platform": "Review & comparison platforms",
+    "competitor_owned": "A competitor's own site",
+    "major_publisher": "Analyst & major press",
+    "community": "Community & social",
+    "editorial": "Independent blogs, listicles & roundups",
+}
+
+
+def classify_domain(domain: str, cfg: Config, competitor_names: set[str]) -> str:
+    d = (domain or "").lower()
+    if not d:
+        return "editorial"
+    owned = {o.lower() for o in cfg.owned_domains}
+    if d in owned or any(d.endswith("." + o) for o in owned):
+        return "owned"
+    if d in _REVIEW_PLATFORMS:
+        return "review_platform"
+    if d in _COMMUNITY:
+        return "community"
+    if d in _MAJOR_PUBLISHERS:
+        return "major_publisher"
+    # A competitor cited from its own domain announces itself. Match the domain's
+    # first label against the competitor names we hold, collapsed to alphanumerics
+    # so "360Learning" matches "360learning.com" and "LinkedIn Learning" does not
+    # accidentally match "linkedin.com" (which is classified as community above).
+    label = re.sub(r"[^a-z0-9]", "", d.split(".")[0])
+    for name in competitor_names:
+        flat = re.sub(r"[^a-z0-9]", "", name.lower())
+        if flat and label and (flat == label or (len(flat) > 5 and flat in label)):
+            return "competitor_owned"
+    return "editorial"
+
+
+def source_gap(observations: list[dict], citations: list[dict],
+               competitors: list[dict], cfg: Config) -> dict:
+    """Where competitors are cited and we are not — and what KIND of source it is.
+
+    This is the half that turns a scoreboard into a to-do list. Knowing we lose
+    "best corporate AI upskilling programs" is not actionable. Knowing that the
+    answers to it cite G2, two competitor blogs and a Forbes roundup — and that we
+    are on none of them — names four specific places to go and get placed.
+    """
+    names = {c["name"] for c in competitors} | {s for s in cfg.competitor_seeds}
+    owned = {o.lower() for o in cfg.owned_domains}
+
+    bench_ids = {q.id for q in cfg.queries if getattr(q, "benchmark", True)}
+    q_text = {q.id: q.text for q in cfg.queries}
+
+    # Queries we did not win, from the live observations only.
+    lost_ids = set()
+    for qid in bench_ids:
+        live = [o for o in observations
+                if o["query_id"] == qid and o.get("is_live") and not o.get("error")]
+        if live and not any(o["status"] in (CITED, MENTIONED) for o in live):
+            lost_ids.add(qid)
+
+    kinds: Counter = Counter()
+    kind_domains: dict[str, Counter] = defaultdict(Counter)
+    per_query: dict[str, dict] = {}
+
+    for c in citations:
+        if c["query_id"] not in lost_ids:
+            continue
+        kind = classify_domain(c.get("domain", ""), cfg, names)
+        kinds[kind] += 1
+        kind_domains[kind][c["domain"]] += 1
+        q = per_query.setdefault(c["query_id"],
+                                 {"query": q_text.get(c["query_id"], c["query_id"]),
+                                  "domains": Counter(), "kinds": Counter()})
+        q["domains"][c["domain"]] += 1
+        q["kinds"][kind] += 1
+
+    # Do we appear on ANY of the source types that win these queries? This is the
+    # sentence that makes the finding land: not "we are absent", but "the answers
+    # that beat us lean on review platforms 14 times and we are on none of them".
+    our_kinds: Counter = Counter()
+    for c in citations:
+        if (c.get("domain") or "").lower() in owned:
+            our_kinds["owned"] += 1
+
+    return {
+        "lost_queries": len(lost_ids),
+        "kinds": [
+            {"kind": k, "label": SOURCE_KINDS.get(k, k), "citations": n,
+             "we_appear": k == "owned",
+             "top_domains": [{"domain": d, "n": c}
+                             for d, c in kind_domains[k].most_common(6)]}
+            for k, n in kinds.most_common()
+        ],
+        "per_query": [
+            {"query_id": qid, "query": v["query"],
+             "domains": [{"domain": d, "n": n} for d, n in v["domains"].most_common(8)],
+             "kinds": dict(v["kinds"])}
+            for qid, v in per_query.items()
+        ],
+        "owned_citations_anywhere": sum(our_kinds.values()),
+    }
+
+
+def seo_overlap(rows: list[dict]) -> dict:
+    """Does SEO feed AEO? Measured, not asserted.
+
+    `rows` is [{query_id, cited_domains, serp_domains}] built by the caller from the
+    AI Overviews engine, which is the only surface that hands back both the generative
+    answer and the organic results underneath it.
+
+    The number that matters is what share of the domains an AI answer CITED were also
+    ranking organically for the same query. High overlap says ranking is still the
+    lever and an AEO programme is mostly an SEO programme with different reporting.
+    Low overlap says they are separate games and the budget has to be separate too.
+
+    ⚠️ Reported with its sample size attached, because on a handful of queries this
+    number swings wildly and a single figure would be read as settled.
+    """
+    pairs, hits, total = 0, 0, 0
+    detail = []
+    for r in rows:
+        cited = {d for d in (r.get("cited_domains") or []) if d}
+        serp = {d for d in (r.get("serp_domains") or []) if d}
+        if not cited or not serp:
+            continue
+        pairs += 1
+        overlap = cited & serp
+        hits += len(overlap)
+        total += len(cited)
+        detail.append({"query_id": r["query_id"], "cited": len(cited),
+                       "also_ranking": len(overlap),
+                       "domains": sorted(overlap)[:6]})
+    return {
+        "queries_compared": pairs,
+        "cited_domains": total,
+        "also_ranking_organically": hits,
+        "overlap_pct": round(100 * hits / total, 1) if total else None,
+        "detail": detail,
+        "verdict": (None if pairs < 3 else
+                    "SEO strongly feeds AEO here — the answers mostly cite what already ranks"
+                    if total and hits / total >= 0.5 else
+                    "SEO and AEO are diverging — the answers cite sources that are not the "
+                    "top organic results, so ranking alone will not buy citations"),
     }

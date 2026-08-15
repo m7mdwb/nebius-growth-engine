@@ -89,12 +89,76 @@ def seed(weeks: int, seed_value: int = 7) -> int:
     return made
 
 
+# ---------------------------------------------------------------------------
+# Track A — prior headcount readings, so the growth proxy has something to compare
+# ---------------------------------------------------------------------------
+
+# Same problem, same answer. Headcount growth needs two sightings and the first run
+# of a fresh clone only ever has one, so the growth path is invisible in a demo — it
+# correctly reports "not yet measured" for every company, which is honest and shows
+# nothing working.
+#
+# ⚠️ The seeded reading is marked `source = 'synthetic-backfill'` IN THE ROW, not just
+# in a caption, exactly like runs.is_synthetic. `leads.growth()` reads that column and
+# labels any growth figure derived from it, so a seeded comparison can never be
+# presented as a measured one. Clear them with --clear-snapshots before a real run.
+SNAPSHOT_SOURCE = "synthetic-backfill"
+
+
+def seed_snapshots(days_ago: int = 30, shrink_pct: float = 6.0) -> int:
+    """Give every company we have already seen one older, smaller reading.
+
+    Deliberately derived from the CURRENT real headcount rather than invented from
+    nothing: the growth percentage is then the only fabricated quantity, and it is a
+    stated assumption rather than a fictional company.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    at = (datetime.now(timezone.utc) - timedelta(days=days_ago)).isoformat(timespec="seconds")
+    made = 0
+    with db.session() as conn:
+        rows = conn.execute(
+            "SELECT domain, company_name, MAX(headcount) hc FROM company_snapshots "
+            "WHERE source != ? AND headcount IS NOT NULL GROUP BY domain",
+            (SNAPSHOT_SOURCE,)).fetchall()
+        for r in rows:
+            before = int(round(r["hc"] * (1 - shrink_pct / 100.0)))
+            conn.execute(
+                "INSERT INTO company_snapshots (domain, observed_at, headcount, "
+                "company_name, source) VALUES (?,?,?,?,?)",
+                (r["domain"], at, before, r["company_name"], SNAPSHOT_SOURCE))
+            made += 1
+    return made
+
+
+def clear_snapshots() -> int:
+    with db.session() as conn:
+        n = conn.execute("SELECT COUNT(*) c FROM company_snapshots WHERE source = ?",
+                         (SNAPSHOT_SOURCE,)).fetchone()["c"]
+        conn.execute("DELETE FROM company_snapshots WHERE source = ?", (SNAPSHOT_SOURCE,))
+    return n
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--weeks", type=int, default=3)
     ap.add_argument("--clear", action="store_true", help="remove all synthetic runs")
+    ap.add_argument("--snapshots", action="store_true",
+                    help="Track A: seed a prior headcount reading per known company, "
+                         "marked synthetic, so growth has something to compare against")
+    ap.add_argument("--days-ago", type=int, default=30)
+    ap.add_argument("--clear-snapshots", action="store_true")
     a = ap.parse_args()
 
+    if a.clear_snapshots:
+        print(f"removed {clear_snapshots()} synthetic snapshot(s)")
+        return 0
+    if a.snapshots:
+        n = seed_snapshots(a.days_ago)
+        print(f"seeded {n} prior headcount reading(s) dated {a.days_ago} days ago, "
+              f"all flagged source='{SNAPSHOT_SOURCE}'")
+        print("growth computed against these is labelled as synthetic in the UI")
+        return 0
     if a.clear:
         print(f"removed {clear()} synthetic run(s)")
         return 0

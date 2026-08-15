@@ -23,7 +23,46 @@ TEMPLATE = ROOT / "web" / "static" / "index.html"
 OUT = ROOT / "out"
 
 
-def _leads_payload() -> dict:
+# ---------------------------------------------------------------------------
+# CONSTRAINT 4 — no scraped personal data leaves this machine.
+# ---------------------------------------------------------------------------
+#
+# This file writes a SHAREABLE artifact. Track A now scrapes real people: names,
+# work emails, LinkedIn URLs, job histories, and a drafted email addressed to them by
+# name. Embedding that in an HTML file that gets attached to a submission, pasted into
+# Slack and left in a Downloads folder is exactly the thing the constraint forbids —
+# and it would happen silently, because the export "just works".
+#
+# So the export REDACTS by default and says that it did. What survives is everything
+# needed to judge the method — the score, every point that made it, the routing and
+# its reasoning, the reconciliation verdict, the company firmographics — and what goes
+# is everything that identifies a human.
+#
+# Company facts are deliberately kept: a headcount is not personal data, and without it
+# the scoring breakdown is unreadable. The email DOMAIN is kept for the same reason
+# (it is the reconciliation key and it names a company, not a person); the local part
+# is masked.
+_PERSONAL = ("name", "email", "linkedin_url", "message", "trace")
+
+
+def _redact(row: dict) -> dict:
+    out = dict(row)
+    email = row.get("email") or ""
+    domain = email.split("@")[-1] if "@" in email else ""
+    out["name"] = "— redacted —"
+    out["email"] = f"•••@{domain}" if domain else "— redacted —"
+    out["linkedin_url"] = None
+    # The draft is the single most identifying field: it is addressed to them by name
+    # and quotes their record back. The COUNT of facts it cited survives, which is what
+    # the "is this a mail-merge" check actually needs.
+    out["message"] = ("— draft redacted from the export. It cited "
+                      f"{len(row.get('evidence') or [])} specific facts from the record; "
+                      "run the app locally to read it.") if row.get("message") else None
+    out["trace"] = []
+    return out
+
+
+def _leads_payload(include_personal: bool = False) -> dict:
     """Track A, so the export carries both tracks and the reviewer can switch."""
     from . import leads as L
     fit = L.load_fit()
@@ -35,14 +74,18 @@ def _leads_payload() -> dict:
         run = db.lead_run(conn, lrid)
     for r in rows:
         r["intent"] = L.intent_points(r["breakdown"])
+    summary = L.summarise(rows)
+    if not include_personal:
+        rows = [_redact(r) for r in rows]
     return {"empty": False, "run": run, "leads": rows,
-            "summary": L.summarise(rows), "routing": fit.routing,
-            "method": fit.method(), "stale_fit": False}
+            "summary": summary, "routing": fit.routing,
+            "method": fit.method(), "stale_fit": False,
+            "redacted": not include_personal}
 
 
-def build_payload() -> dict:
+def build_payload(include_personal: bool = False) -> dict:
     cfg = config.load()
-    leads_payload = _leads_payload()
+    leads_payload = _leads_payload(include_personal)
     with db.session() as conn:
         rid = db.latest_run_id(conn)
         runs = db.runs(conn)
@@ -87,14 +130,34 @@ def build_payload() -> dict:
         for k, v in cells.items()
     ]
 
+    # Same derived views the live API serves, so the export is not a lesser page.
+    import json as _json
+    serp_by_q: dict[str, set] = defaultdict(set)
+    cited_by_q: dict[str, set] = defaultdict(set)
+    for o in obs:
+        try:
+            for dmn in _json.loads(o.get("serp_domains") or "[]"):
+                serp_by_q[o["query_id"]].add(dmn)
+        except (TypeError, ValueError):
+            pass
+    for c in cits:
+        if c.get("domain"):
+            cited_by_q[c["query_id"]].add(c["domain"])
+    seo_rows = [{"query_id": q, "cited_domains": sorted(cited_by_q.get(q, ())),
+                 "serp_domains": sorted(v)} for q, v in serp_by_q.items() if v]
+
     return {
         "leads": leads_payload,
         "report": {
             "empty": False,
             "run": run,
             "summary": analyze.summarise(obs, cits, comps),
+            "benchmark": analyze.benchmark(obs, cfg),
+            "source_gap": analyze.source_gap(obs, cits, comps, cfg),
+            "seo": analyze.seo_overlap(seo_rows),
             "grid": grid,
-            "queries": [{"id": q.id, "text": q.text, "intent": q.intent} for q in cfg.queries],
+            "queries": [{"id": q.id, "text": q.text, "intent": q.intent,
+                         "benchmark": q.benchmark} for q in cfg.queries],
             "engines": [{"key": k, "label": ENGINE_LABELS.get(k, k)}
                         for k in ENGINE_LABELS if cfg.engine_enabled(k)],
             "brand": cfg.brand_name,
@@ -105,12 +168,12 @@ def build_payload() -> dict:
     }
 
 
-def export(path: Path | None = None) -> Path:
+def export(path: Path | None = None, include_personal: bool = False) -> Path:
     OUT.mkdir(parents=True, exist_ok=True)
     path = path or (OUT / "aeo_report.html")
 
     html = TEMPLATE.read_text(encoding="utf-8")
-    blob = json.dumps(build_payload(), ensure_ascii=False)
+    blob = json.dumps(build_payload(include_personal), ensure_ascii=False)
     # </script> inside JSON would close the tag early.
     blob = blob.replace("</", "<\\/")
     html = html.replace(
@@ -122,4 +185,17 @@ def export(path: Path | None = None) -> Path:
 
 
 if __name__ == "__main__":
-    print(export())
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Write the standalone HTML report.")
+    ap.add_argument(
+        "--include-personal", action="store_true",
+        help="Embed scraped names, emails, profile URLs and drafted messages. OFF by "
+             "default: this file is meant to be shared, and Track A holds real people. "
+             "Only pass this for a local demo whose leads you know are public figures.")
+    a = ap.parse_args()
+    p = export(include_personal=a.include_personal)
+    print(p)
+    print("personal fields EMBEDDED — do not share this file"
+          if a.include_personal else
+          "personal fields redacted (names, emails, profile URLs, drafts)")

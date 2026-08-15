@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from decimal import Decimal
 from urllib.parse import urlparse
 
 from .config import Config, env
@@ -32,6 +33,13 @@ class EngineResult:
     is_live: bool
     answer: str = ""
     citations: list[dict] = field(default_factory=list)   # {url, domain, title}
+    # Everything the engine RETRIEVED, cited or not. Deliberately a separate field:
+    # see the "search results are not citations" note above. Track C's source-gap
+    # analysis needs both, and needs to keep them apart.
+    retrieved: list[dict] = field(default_factory=list)
+    # The organic SERP for the same query, where the surface exposes one. Only
+    # AI Overviews does. Used to measure whether SEO feeds AEO — see analyze.py.
+    serp: list[dict] = field(default_factory=list)
     error: str | None = None
     note: str | None = None      # why a seam is a seam, shown in the UI
 
@@ -48,6 +56,33 @@ def domain_of(url: str) -> str:
 # LIVE — Claude with the web_search server tool
 # ---------------------------------------------------------------------------
 
+# ⚠️ MEASURED 2026-08-15 by scripts/probe.py, and it changed this function.
+#
+# Asked bare, the model routes its searches THROUGH THE CODE EXECUTION TOOL — it
+# writes Python that awaits web_search(), reads the results itself, and writes prose
+# from them. Search results consumed inside code carry no citation objects, so the
+# answer comes back with `citations = None` on every text block. Measured: 6,326
+# characters of confident answer and ZERO parseable citations.
+#
+# That failure is the dangerous kind, because it does not look like a failure. Every
+# cell would classify as `mentioned`, never `cited`, and citation share — the one
+# actionable metric on the page — would sit at a flat 0% that reads as a finding
+# rather than as a broken instrument.
+#
+# The one line below fixes it: same query, 14 citations, stop_reason `end_turn`.
+#
+# 🔑 Why this does NOT corrupt the reading, which was the original objection to having
+# a system prompt at all: it constrains HOW THE TOOL IS INVOKED, not what the answer
+# may say. It names no brand, no competitor, no product category and no ranking
+# criterion. The measurement stays a measurement of what the surface returns; it just
+# returns it in a form where the links are attached to the sentences.
+_DIRECT_SEARCH = (
+    "Answer the question directly using web search. Do not use the code execution tool."
+)
+
+_WEB_SEARCH_TOOL = {"type": "web_search_20260209", "name": "web_search", "max_uses": 5}
+
+
 def claude(query: str, cfg: Config) -> EngineResult:
     key = env("ANTHROPIC_API_KEY")
     if not key:
@@ -56,18 +91,22 @@ def claude(query: str, cfg: Config) -> EngineResult:
     import anthropic
 
     model = cfg.engines.get("claude", {}).get("model", "claude-opus-5")
-    max_tokens = int(cfg.engines.get("claude", {}).get("max_tokens", 2000))
+    # ⚠️ Also measured by the probe: at 1,500 tokens the turn ended on `max_tokens`
+    # mid-sentence. A truncated answer under-reports every brand named after the cut,
+    # which is a silent bias toward `absent` — so the ceiling is generous on purpose
+    # and a truncated answer is flagged below rather than scored.
+    max_tokens = int(cfg.engines.get("claude", {}).get("max_tokens", 4000))
     client = anthropic.Anthropic(api_key=key)
 
-    try:
-        resp = client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            # No system prompt on purpose. We are measuring what an ordinary
-            # user sees, so steering the assistant would corrupt the reading.
-            tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 5}],
-            messages=[{"role": "user", "content": query}],
+    def ask(messages: list[dict]):
+        return client.messages.create(
+            model=model, max_tokens=max_tokens, system=_DIRECT_SEARCH,
+            tools=[_WEB_SEARCH_TOOL], messages=messages,
         )
+
+    msgs = [{"role": "user", "content": query}]
+    try:
+        resp = ask(msgs)
     except Exception as exc:  # noqa: BLE001 - any failure is a recorded miss, not a crash
         return EngineResult("claude", True, error=f"{type(exc).__name__}: {exc}")
 
@@ -75,15 +114,7 @@ def claude(query: str, cfg: Config) -> EngineResult:
     # a truncated answer as if it were the whole answer.
     if getattr(resp, "stop_reason", None) == "pause_turn":
         try:
-            resp = client.messages.create(
-                model=model,
-                max_tokens=max_tokens,
-                tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 5}],
-                messages=[
-                    {"role": "user", "content": query},
-                    {"role": "assistant", "content": resp.content},
-                ],
-            )
+            resp = ask(msgs + [{"role": "assistant", "content": resp.content}])
         except Exception as exc:  # noqa: BLE001
             return EngineResult("claude", True, error=f"resume failed: {exc}")
 
@@ -92,6 +123,7 @@ def claude(query: str, cfg: Config) -> EngineResult:
 
     text_parts: list[str] = []
     cites: dict[str, dict] = {}
+    retrieved: dict[str, dict] = {}
 
     for block in resp.content:
         btype = getattr(block, "type", None)
@@ -108,9 +140,31 @@ def claude(query: str, cfg: Config) -> EngineResult:
                     "domain": domain_of(url),
                     "title": getattr(c, "title", None) or "",
                 })
+        elif btype == "web_search_tool_result":
+            # Everything the search returned, whether or not the answer used it.
+            # Kept SEPARATE from citations on purpose — see the module docstring.
+            # Track C's source-gap analysis reads this: a competitor's page that was
+            # retrieved and not cited is a different (and weaker) finding than one the
+            # answer actually linked, and merging them would inflate both.
+            for item in (getattr(block, "content", None) or []):
+                url = getattr(item, "url", None)
+                if not url:
+                    continue
+                retrieved.setdefault(url, {
+                    "url": url,
+                    "domain": domain_of(url),
+                    "title": getattr(item, "title", None) or "",
+                })
 
-    return EngineResult("claude", True, answer="\n".join(text_parts).strip(),
-                        citations=list(cites.values()))
+    truncated = getattr(resp, "stop_reason", None) == "max_tokens"
+    return EngineResult(
+        "claude", True, answer="\n".join(text_parts).strip(),
+        citations=list(cites.values()),
+        retrieved=list(retrieved.values()),
+        # Not an error — the answer is real, just incomplete. Recorded so a run
+        # full of truncations is visible instead of reading as a drop in presence.
+        note="answer truncated at max_tokens" if truncated else None,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -131,23 +185,32 @@ def ai_overviews(query: str, cfg: Config) -> EngineResult:
         return EngineResult("ai_overviews", False,
                             note="no APIFY_TOKEN set — Google AI Overviews not captured")
 
-    from apify_client import ApifyClient
+    from .cost import Budget, apify_call
 
     country = cfg.engines.get("ai_overviews", {}).get("country", "us")
-    client = ApifyClient(token)
 
     try:
-        run = client.actor(_APIFY_ACTOR).call(
-            run_input={
+        # ⚠️ This used to call the client directly with `timeout_secs=180`, which
+        # apify-client 3.x does not accept — it was dead on arrival and had never been
+        # run. Routed through the shared helper now, so it gets the spend cap too.
+        items = apify_call(
+            _APIFY_ACTOR,
+            {
                 "queries": query,
                 "resultsPerPage": 10,
                 "maxPagesPerQuery": 1,
                 "countryCode": country,
                 "languageCode": "en",
             },
-            timeout_secs=180,
+            # One engine call, one budget — the AEO collector caps its own spend by
+            # limiting how many queries it runs, not per call.
+            Budget(apify_calls=1),
+            what=f"AI Overviews: {query[:40]}",
+            timeout_s=180,
+            # This actor's declared minimum ceiling. A search costs a fraction of a
+            # cent; $0.50 is the lowest cap it will accept, not the price.
+            max_usd=Decimal("0.50"),
         )
-        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
     except Exception as exc:  # noqa: BLE001
         return EngineResult("ai_overviews", True, error=f"{type(exc).__name__}: {exc}")
 
@@ -183,8 +246,24 @@ def ai_overviews(query: str, cfg: Config) -> EngineResult:
             "title": (src.get("title") if isinstance(src, dict) else "") or "",
         })
 
+    # 🔑 The organic SERP for the SAME query, captured because it is sitting right
+    # there in the same response and it answers a question this whole category argues
+    # about without evidence: DOES SEO FEED AEO?
+    #
+    # Everyone asserts it. Here it is measurable — compare the domains Google's AI
+    # Overview chose to cite against the domains ranking organically underneath it.
+    # High overlap means ranking is the lever and AEO is mostly SEO with extra steps;
+    # low overlap means they are different games and an AEO programme needs its own
+    # budget. `analyze.seo_overlap()` does the comparison; this just keeps the data.
+    serp = []
+    for i, o in enumerate(page.get("organicResults") or [], 1):
+        url = o.get("url") or o.get("link") or ""
+        if url:
+            serp.append({"rank": i, "url": url, "domain": domain_of(url),
+                         "title": (o.get("title") or "")[:120]})
+
     return EngineResult("ai_overviews", True, answer=str(answer).strip(),
-                        citations=list(cites.values()))
+                        citations=list(cites.values()), serp=serp)
 
 
 # ---------------------------------------------------------------------------

@@ -24,6 +24,35 @@ icp:
       - {min: 1000, max: 4999,  points: 20}
       - {min: 5000, max: 999999, points: 25}
 
+  # 🔑 THE GROWTH PROXY, and the reason it is measured rather than looked up.
+  #
+  # Revenue and valuation are the obvious growth signals and they are NOT OBTAINABLE
+  # for most private companies at any price. A model asked to find them returns a
+  # fluent, specific, confident and unfalsifiable number — which is worse than a blank,
+  # because a blank is honest. So they are never asked for. See `never_guessed` below.
+  #
+  # Headcount off the LinkedIn company page is the growth proxy that IS real. But
+  # LinkedIn publishes today's number and keeps no public history, so growth needs two
+  # sightings: the run stores a timestamped snapshot per company, and growth is
+  # computed the second time we see one. Until then it is unknown and scores ZERO.
+  #
+  # ⚠️ Zero here means "not yet measured", NOT "flat". The UI must say which, and the
+  # breakdown row is omitted entirely rather than shown as +0 — a zero-point row reads
+  # as a measurement that came back negative.
+  headcount_growth:
+    why: >
+      Hiring is the cheapest honest signal that a company is expanding, and an
+      expanding company is one that has new people to train — which is the actual
+      trigger for an enterprise learning platform. It needs two observations at
+      least min_days apart; two readings an hour apart differ by scraper noise, and
+      dividing noise by a small elapsed time manufactures a large growth rate.
+    min_days: 7
+    bands:
+      - {min_pct: 10.0, points: 20, label: "growing fast"}
+      - {min_pct: 3.0,  points: 12, label: "growing"}
+      - {min_pct: -2.0, points: 4,  label: "stable"}
+      - {min_pct: -100.0, points: 0, label: "shrinking"}
+
   seniority:
     # Buying committee for an L&D platform: HR/People leadership plus a technical
     # sponsor. An individual contributor is a signal, not a buyer.
@@ -32,14 +61,36 @@ icp:
     # from a provider's own "seniority" field. Every vendor uses a different
     # taxonomy, so importing theirs means our score silently changes meaning the
     # day we switch vendor. The title is the raw fact; the tier is our judgement.
-    - {match: [chro, "chief people", "chief learning", cto, "chief technology"], points: 25, label: exec}
-    - {match: [vp, "head of", director], points: 20, label: leader}
+    #
+    # ⚠️ THE C-SUITE ROW EXISTS BECAUSE THE FIRST LIVE RUN EXPOSED ITS ABSENCE.
+    # The original list named only the L&D buying committee — CHRO, CLO, CTO — so
+    # "Chairman and CEO" and "Co-Founder and CEO" matched NOTHING and scored zero on
+    # seniority. SAP's CEO came out at 46 points, below a mid-level L&D manager,
+    # which is obviously wrong for an enterprise platform sold as a company-wide
+    # programme. Nobody spotted it against fixture data because the fixtures only
+    # ever contained the titles the list was written for.
+    # This is the argument for the `gaps` list in one example: the rule did not fail
+    # loudly, it failed by silently omitting a row, and only naming the omission
+    # made it visible.
+    - {match: [ceo, "chief executive", "chief operating", coo, cfo, "chief financial",
+               founder, "co-founder", "managing director", president, chairman],
+       points: 25, label: exec}
+    - {match: [chro, "chief people", "chief learning", cto, "chief technology",
+               "chief information", cio, "chief data", "chief digital"],
+       points: 25, label: exec}
+    - {match: [vp, "vice president", "head of", director], points: 20, label: leader}
     - {match: [manager, lead], points: 10, label: manager}
     - {match: [specialist, coordinator, analyst, associate], points: 3, label: ic}
 
   function:
     - {match: ["l&d", "learning", "talent", "people", "hr", "human resources"], points: 20, label: L&D / People}
     - {match: ["engineering", "data", "technology", "digital", "transformation"], points: 15, label: Technical}
+    # A CEO or founder is not IN the L&D function — they are the sponsor above it.
+    # Worth points, but fewer than the person who owns the budget line, because a
+    # sponsor still has to hand it to someone and that someone is the real evaluator.
+    - {match: [ceo, "chief executive", founder, "co-founder", "managing director",
+               president, chairman, coo, "chief operating"],
+       points: 12, label: Executive sponsor}
     - {match: ["operations", "strategy"], points: 8, label: Adjacent}
 
   industry:
@@ -74,6 +125,15 @@ disqualifiers:
   blocked_industries: [education]     # we sell TO enterprises, not to competitors
   min_headcount: 50
 
+# Facts that are NEVER asked for, of a model or of anything else. Named here so the
+# omission is a decision on the record rather than a gap someone helpfully fills in
+# later. Each is unobtainable for a private company, and each is the kind of number an
+# LLM will produce on request, to two decimal places, entirely from imagination.
+never_guessed:
+  - revenue
+  - valuation
+  - funding_total
+
 routing:
   # Thresholds are stated once, here, so a change is one line and is reviewable.
   #
@@ -82,17 +142,23 @@ routing:
   # attended straight to sales on a five-minute SLA — earned entirely on
   # headcount, seniority and industry. Firmographics are not a buying signal.
   # Fit says "worth talking to"; intent says "now". Both, or it isn't now.
-  - {min_score: 70, min_intent: 25, route: sales_now,  sla_minutes: 5,
+  #
+  # 🔑 This is also why a lead looked up cold — typed into the form with no behaviour
+  # attached — CANNOT route hot, however perfect the firmographics. That is the gate
+  # working, not a bug: we know who they are and we know nothing about whether they
+  # want anything. The same person with `booked_demo` on the record routes hot.
+  - {min_score: 70, min_intent: 25, route: hot, sla_minutes: 5,
      why: "Fit AND intent both clear the bar. Speed-to-lead is the single biggest lever on conversion; five minutes is the mandate, not an aspiration."}
-  - {min_score: 45, route: sdr_queue,  sla_minutes: 1440,
+  - {min_score: 45, route: warm, sla_minutes: 1440,
      why: "Real fit, weaker intent. Worth a human touch inside a day, not inside five minutes."}
-  - {min_score: 20, route: nurture,    sla_minutes: null,
-     why: "Plausible fit, no buying signal yet. Automated nurture until behaviour changes."}
-  - {min_score: 0,  route: hold,       sla_minutes: null,
+  - {min_score: 20, route: revisit_6mo, sla_minutes: null,
+     why: "Plausible fit, no buying signal yet. Re-scored in six months rather than worked now — the firmographics that fall short today are the ones most likely to have moved, and headcount growth is only measurable across that kind of gap anyway."}
+  - {min_score: 0,  route: hold, sla_minutes: null,
      why: "Insufficient fit. Held rather than deleted so the definition can be re-tested against it later."}
 
 # --------------------------------------------------------------------------
-# Enrichment: mocked in this prototype, and this is the production plan.
+# Enrichment. The first five steps are LIVE and run against real APIs; the last
+# two are the production continuation and are labelled as such.
 # --------------------------------------------------------------------------
 enrichment:
   strategy: >
@@ -104,32 +170,73 @@ enrichment:
     It is also why `needs_review` exists as a route — at 85-95%, roughly one lead
     in ten still won't resolve, and that one needs a human, not a low number.
 
+  # 🔑 Per-run cost caps. A retry loop against a paid actor is real money, and this
+  # is the file where the number is set rather than buried next to the call.
+  # Measured on 2026-08-15: one lead costs 1 Serper query + 2 Apify calls = ~$0.025.
+  # The caps below therefore allow about five leads per run, which is a demo, not a
+  # ration. Hitting a cap RAISES and is reported — a capped run that silently returns
+  # fewer results is indistinguishable from a thin day.
+  caps:
+    apify_calls: 12
+    serper_calls: 8
+    apify_usd_per_call: 0.10
+
   # Ordered. Each entry only gets called if everything above it missed.
   waterfall:
     - provider: First-party form
+      status: live
       gives: name, work email, company as typed, self-declared role, assessment answers
       cost: free
       why: >
         Already ours and more current than anything purchasable. Self-reported job
         title beats a third-party title that may be two promotions out of date.
     - provider: Domain heuristics
-      gives: company domain, free-provider detection, MX validity
+      status: live
+      gives: company domain, free-provider detection
       cost: free
-      why: Derived from the email. Catches the disqualifiers before spending a credit.
-    - provider: Apollo.io
-      gives: firmographics, headcount, industry, title
-      cost: free tier, then ~$49/user/mo
-      why: Widest cheap coverage; the right first paid step, strongest in North America.
+      why: >
+        Derived from the email. Catches the disqualifiers before spending a credit —
+        a personal mailbox has no company behind it, so the two paid calls are
+        skipped rather than spent proving it.
+    - provider: Serper (Google)
+      status: live
+      gives: the LinkedIn profile URL behind a name and an employer
+      cost: ~$0.001 per query, 2,500 free credits
+      why: >
+        The scrapers need a URL and the form gives a name. This is the hop between.
+        ⚠️ It only ever PROPOSES — the top hit for a common name is a different real
+        person often enough that accepting it unchecked would attach a stranger's
+        career to a real lead. See the reconciliation step.
+    - provider: Apify — harvestapi/linkedin-profile-scraper
+      status: live
+      gives: structured current position, employer, tenure, location, about, skills
+      cost: ~$0.01 per profile
+      why: >
+        The structured `currentPosition` is the fact; the self-written `headline`
+        ("Helping teams unlock AI!") is marketing and a bad input to a seniority
+        rule. It also returns the employer's own LinkedIn URL, which is a better
+        company key than anything derivable from the email.
+    - provider: Apify — harvestapi/linkedin-company
+      status: live
+      gives: employeeCount, industry, description, website, HQ, specialities
+      cost: ~$0.01 per company
+      why: >
+        `employeeCount` is the growth proxy and `website` is what reconciles the
+        whole record against the email domain. Both are load-bearing.
     - provider: Cognism
+      status: production plan — not built
       gives: EU firmographics, phone-verified contacts, consent/DNC status
       cost: enterprise
       why: >
-        The EU-specific step, and not optional here. Nebius Academy is expanding
-        into Europe, where enrichment and outbound sit under GDPR legitimate
-        interest — Cognism ships DNC screening and lawful-basis documentation
-        rather than leaving you to argue it after the fact. US-centric providers
-        have both thinner EU coverage and thinner compliance posture.
+        The EU-specific step, and the first thing to add. Nebius Academy is
+        expanding into Europe, where enrichment and outbound sit under GDPR
+        legitimate interest — Cognism ships DNC screening and lawful-basis
+        documentation rather than leaving you to argue it after the fact.
+        ⚠️ This matters more with live scraping than it did with a fixture: the
+        prototype now processes real personal data, so lawful basis stops being a
+        slide and becomes a build requirement.
     - provider: Clay
+      status: production plan — not built
       gives: orchestration across 100+ sources
       cost: from ~$185/mo
       why: >
@@ -139,80 +246,138 @@ enrichment:
 
   # What we need, where it comes from, and how we know it is not wrong.
   fields:
-    - {field: company_domain, source: derived from email,
-       verify: "not a free-mail provider; MX record resolves",
+    - {field: company_domain, source: "derived from the email — the ONLY fact no search engine proposed",
+       verify: "not a free-mail provider",
        risk: "wrong domain means every downstream fact belongs to another company"}
-    - {field: company_name, source: enrichment,
-       verify: "must reconcile with the domain's registrant",
+    - {field: linkedin_profile, source: "Serper, then reconciled",
+       verify: "the scraped employer's website must match the email domain",
+       risk: "the top hit for a common name is a DIFFERENT REAL PERSON — an unreconciled record is confidently wrong, not blank, and nothing downstream can tell"}
+    - {field: company_name, source: "LinkedIn company page",
+       verify: "must reconcile with the email domain",
        risk: "subsidiary vs group confusion mis-sizes the account"}
-    - {field: headcount, source: enrichment,
+    - {field: headcount, source: "LinkedIn employeeCount",
        verify: "banded, never exact; providers disagree 2-3x",
        risk: "an exact figure makes the score move when the vendor updates"}
-    - {field: industry, source: enrichment,
-       verify: "normalised to our own list, not the vendor taxonomy",
+    - {field: headcount_growth, source: "TWO snapshots, min_days apart — computed, never fetched",
+       verify: "unknown until a second sighting exists; scores zero and says so",
+       risk: "LinkedIn publishes no history, so any single-scrape growth figure is invented"}
+    - {field: revenue / valuation / funding, source: "NOT COLLECTED — see never_guessed",
+       verify: "n/a — never asked for, of any source",
+       risk: "unobtainable for private companies, and a model asked for them invents fluent, specific, unfalsifiable numbers"}
+    - {field: industry, source: "LinkedIn industry taxonomy",
+       verify: "matched against our own keyword list, not imported wholesale",
        risk: "vendor taxonomies differ, so the same company scores differently per source"}
-    - {field: job_title, source: "form first, enrichment second",
-       verify: "prefer self-reported; third-party titles go stale within months",
-       risk: "a stale title mis-reads the buying role entirely"}
+    - {field: job_title, source: "structured currentPosition, NOT the headline",
+       verify: "the headline is self-written marketing and is only a fallback",
+       risk: "'Helping teams unlock AI' parses as no seniority at all"}
     - {field: seniority + function, source: "DERIVED by our rules from the title",
        verify: "deterministic and versioned in this file",
        risk: "importing a vendor's seniority field couples our score to their taxonomy"}
     - {field: intent signals, source: "first-party, our own systems",
        verify: "timestamped events, no third party involved",
        risk: "the most predictive input; under-weighting it is the commonest scoring error"}
-    - {field: email deliverability, source: verification provider,
+    - {field: email deliverability, source: "production plan — not built",
        verify: "syntax, MX, catch-all detection before any send",
        risk: "bounces damage sender reputation for every later campaign"}
 
 drafting:
   model: claude-opus-5
-  max_tokens: 900
+  max_tokens: 2400
   # The model must declare which enrichment facts it used. That turns
   # "personalised" from a claim into something you can audit in one glance —
   # and a draft that cites no facts is a mail-merge wearing a costume.
   require_evidence: true
 
-# Five sample leads. Deliberately not five good ones: a clean exec, a strong
-# firmographic profile with no intent, a disqualified free-email student, a
-# mid-market manager, and one that CANNOT be enriched. The last is the one that
-# matters — see leads.py.
-samples:
-  - email: k.andersen@meridianbank.com
-    first_name: Karin
-    last_name: Andersen
-    company: Meridian Bank
-    source: completed_assessment
-    signals: [completed_assessment, pricing_page]
-    note: "Assessment score: 2.1/5 on AI readiness, 8,000 employees"
+  # 🔑 THE DIVISION OF LABOUR, and it is the whole argument of this file.
+  #
+  # The model does TWO things, both of which are genuinely beyond a rule:
+  #   1. infer what this company's AI-adoption problem probably is, from its own
+  #      description, size, industry and what this person's role would feel of it
+  #   2. write a sentence that sounds like a person wrote it
+  #
+  # The model does NOT do the score, the routing, the SLA or the disqualification.
+  # Those are arithmetic over the rules above, and arithmetic does not belong in a
+  # prompt: ask an LLM to score a lead out of 100 and you get a confident number it
+  # cannot reproduce twice and no salesperson can argue with.
+  #
+  # ⚠️ Pain points are INFERENCE and are labelled as inference wherever they appear.
+  # They are the model's reading of public evidence, not a fact about the account,
+  # and the moment they get displayed as findings someone will quote one back to a
+  # prospect as if we knew it.
+  infer_pain_points: true
+  max_pain_points: 3
 
-  - email: t.okafor@helioxenergy.com
-    first_name: Tunde
-    last_name: Okafor
-    company: Heliox Energy
+# Five sample leads, deliberately not five good ones — every routing branch is
+# exercised by one of them. The form on the Track A tab does the same thing for any
+# name and email you type; these exist so a walkthrough has something to press.
+#
+# 🔑 WHAT IS REAL HERE AND WHAT IS NOT, because the difference is the whole point:
+#
+#   REAL, scraped live per run: the LinkedIn profile, the job title, the employer,
+#   headcount, industry, HQ. These are looked up at runtime against public company
+#   pages and are not stored in this file. If a company hires 400 people next month,
+#   this file does not change and the score does.
+#
+#   MOCK, and stated as such: the `signals` and `note` — the behavioural half. We have
+#   no access to Nebius Academy's actual form submissions, and the brief explicitly
+#   allows realistic mock data where internal systems would normally supply it. Intent
+#   is the one input that MUST be first-party, so mocking it is the honest option and
+#   inventing a plausible third-party substitute would not be.
+#
+#   The emails are pattern-constructed (first.last@domain). The DOMAIN is the real
+#   part, and the domain is the only thing the reconciliation check actually uses.
+#
+# The people are current, named, public company leadership — chosen so anyone can
+# verify the scraped record against reality in ten seconds, which is what makes a
+# demo of live enrichment worth watching rather than taking on trust.
+samples:
+  # Large enterprise, exec, and behaviour that earns the fast lane. The only one of
+  # the five that can route hot, because it is the only one with real intent.
+  - email: satya.nadella@microsoft.com
+    first_name: Satya
+    last_name: Nadella
+    source: completed_assessment
+    signals: [completed_assessment, booked_demo]
+    note: "Assessment score: 2.4/5 on AI readiness. Booked a demo the same day."
+
+  # ⚠️ THE min_intent GATE, demonstrated. Enormous company, right seniority, right
+  # industry — a fit score that clears any sane threshold, and one webinar signup it
+  # never showed up to. Routing on the total alone would put this on a five-minute
+  # SLA. It is not a buying signal and it does not get one.
+  - email: christian.klein@sap.com
+    first_name: Christian
+    last_name: Klein
     source: webinar
     signals: [webinar_registered]
-    note: "Registered, did not attend"
+    note: "Registered for the enterprise AI webinar, did not attend."
 
+  # Mid-market, and the band that most B2B scoring models get wrong by treating
+  # headcount as linear.
+  - email: hanno.renner@personio.de
+    first_name: Hanno
+    last_name: Renner
+    source: completed_assessment
+    signals: [completed_assessment, pricing_page]
+    note: "Assessment score: 3.1/5. Two visits to pricing in a week."
+
+  # Disqualified before any paid call is made. There is no company behind a personal
+  # mailbox, so spending two Apify credits to confirm that is money for nothing —
+  # the domain check short-circuits the waterfall.
   - email: sam.parker92@gmail.com
     first_name: Sam
     last_name: Parker
-    company: ""
     source: content_download
     signals: [content_download]
-    note: "Downloaded the AI readiness guide"
+    note: "Downloaded the AI readiness guide from a personal address."
 
+  # 🔑 THE ONE THAT MATTERS. A company that will not resolve — no LinkedIn page, no
+  # reconcilable record. It routes to a HUMAN, not to the bottom of the list. Scoring
+  # it would invent a low number out of missing data and quietly bin a lead who
+  # completed the assessment and attended the webinar, and nobody ever goes looking
+  # for the leads that never arrived.
   - email: p.novak@kestrel-logistics.com
     first_name: Petra
     last_name: Novak
-    company: Kestrel Logistics
     source: completed_assessment
     signals: [completed_assessment, webinar_attended]
-    note: "Assessment score: 1.4/5, flagged 'no internal training capability'"
-
-  - email: r.delacroix@voltaire-partners.fr
-    first_name: Renaud
-    last_name: Delacroix
-    company: Voltaire Partners
-    source: completed_assessment
-    signals: [completed_assessment, booked_demo]
-    note: "Enrichment provider returns nothing for this domain"
+    note: "Assessment score: 1.4/5, flagged 'no internal training capability'."

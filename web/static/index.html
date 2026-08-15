@@ -173,6 +173,116 @@ ol.recs{margin:0 0 0 20px;font-size:14px;color:var(--ink-2)}
 ol.recs li{margin-bottom:9px}
 ol.recs b{color:var(--ink)}
 footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
+.warn-t{color:var(--warn,#b45309)}
+
+/* ---- the N-of-10 benchmark ---- */
+.bench{border:1px solid var(--border);border-radius:10px;padding:20px;background:var(--surface)}
+.bench-top{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
+.bench-n{display:flex;align-items:baseline;gap:7px;flex:0 0 auto;
+  font-variant-numeric:tabular-nums;line-height:1}
+.bench-n b{font-size:58px;font-weight:700;color:var(--ink)}
+.bench-n span{font-size:17px;color:var(--muted)}
+.bench-txt{flex:1 1 380px;min-width:0}
+.bench-txt h2{margin-top:0}
+.bench-rows{margin-top:16px;border-top:1px solid var(--border);padding-top:12px;
+  display:flex;flex-direction:column;gap:1px}
+.br{display:grid;grid-template-columns:96px 1fr auto;gap:10px;align-items:center;
+  padding:6px 8px;border-radius:5px;font-size:13px}
+.br:hover{background:var(--surface-2)}
+.br-s{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+.br-q{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.br-i{font-size:11px;color:var(--muted)}
+.br.s-cited .br-s{color:#15803d}
+.br.s-mentioned .br-s{color:#a16207}
+.br.s-absent .br-s{color:var(--muted)}
+.br.s-unmeasured{opacity:.65}
+.br.s-unmeasured .br-s{color:#7c3aed}
+.br.s-unmeasured .br-q{background:repeating-linear-gradient(45deg,transparent,transparent 5px,
+  var(--grid) 5px,var(--grid) 6px);border-radius:3px}
+
+/* ---- source gap ---- */
+.kinds{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:12px}
+.kind{border:1px solid var(--border);border-radius:8px;padding:13px;background:var(--surface-2)}
+.kind.ours{border-color:#15803d}
+.kind-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.kind-h b{font-size:13.5px}
+.kind-h span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.kind-w{font-size:12px;margin:5px 0 8px;color:var(--muted)}
+.kind.ours .kind-w{color:#15803d;font-weight:600}
+.kind-d{display:flex;flex-wrap:wrap;gap:4px}
+.kind-d span{font-size:11.5px;background:var(--surface);border:1px solid var(--border);
+  border-radius:4px;padding:2px 6px;color:var(--ink-2)}
+.kind-d i{color:var(--muted);font-style:normal;font-variant-numeric:tabular-nums}
+
+/* ---- recommendations ---- */
+.rec{border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px;
+  background:var(--surface)}
+.rec-h{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.rec-n{width:20px;height:20px;border-radius:50%;background:var(--series-1);color:#fff;
+  font-size:11.5px;font-weight:700;display:grid;place-items:center;flex:0 0 auto}
+.rec-h b{font-size:14.5px;flex:1 1 auto}
+.rec-m{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.rec p{font-size:13.5px;color:var(--ink-2);margin:8px 0 9px}
+.rec-ev{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.rec-ev span{font-size:11px;background:var(--surface-2);border:1px solid var(--border);
+  border-radius:4px;padding:2px 7px;color:var(--muted)}
+.rec-me{font-size:12.5px;color:var(--ink-2);border-top:1px solid var(--grid);padding-top:8px}
+
+/* ---- forms (lead lookup + ad-hoc query) ---- */
+.lf{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.lf input{flex:1 1 170px;min-width:0;padding:9px 11px;border:1px solid var(--border);
+  border-radius:6px;background:var(--surface);color:var(--ink);font-size:13.5px;
+  font-family:inherit}
+.lf input:focus{outline:2px solid var(--series-1);outline-offset:-1px}
+.lf button{flex:0 0 auto}
+.lf-sig{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:11px}
+.lf-lbl{font-size:12px;color:var(--muted);flex-basis:100%}
+.lf-sig label{font-size:12.5px;color:var(--ink-2);display:inline-flex;align-items:center;
+  gap:5px;border:1px solid var(--border);border-radius:5px;padding:4px 8px;cursor:pointer}
+.lf-sig label:hover{border-color:var(--series-1)}
+.lf-sig i{font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* ---- reconciliation, gaps, pain points ---- */
+.recon{font-size:12.5px;margin:8px 0;padding:6px 10px;border-radius:5px;
+  border-left:3px solid var(--border);background:var(--surface-2)}
+.recon span{color:var(--muted);margin-left:7px}
+.recon.v-verified{border-left-color:#15803d}
+.recon.v-weak{border-left-color:#a16207}
+.recon.v-mismatch{border-left-color:#b91c1c}
+.recon.v-thin{border-left-color:#7c3aed}
+.gaps{font-size:12px;margin:8px 0;color:var(--muted)}
+.gaps b{display:block;margin-bottom:4px;color:var(--ink-2)}
+.gaps span{display:block;padding:2px 0 2px 11px;border-left:2px solid var(--grid)}
+.pp{margin:10px 0;border-top:1px solid var(--grid);padding-top:9px}
+.pp-h{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+  margin-bottom:7px}
+.pp-h i{text-transform:none;letter-spacing:0;font-style:italic}
+.pp-r{display:flex;gap:9px;margin-bottom:7px;align-items:flex-start}
+.pp-r div{flex:1 1 auto;min-width:0}
+.pp-r b{display:block;font-size:13px;font-weight:600;color:var(--ink)}
+.pp-r span{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+.conf{font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;
+  border-radius:3px;padding:2px 5px;flex:0 0 auto;margin-top:2px}
+.conf.c-high{background:#15803d22;color:#15803d}
+.conf.c-medium{background:#a1620722;color:#a16207}
+.conf.c-low{background:var(--surface-2);color:var(--muted)}
+.li{font-size:11.5px;margin-left:7px;color:var(--series-1);text-decoration:none}
+.li:hover{text-decoration:underline}
+
+/* ---- ad-hoc results ---- */
+.ah-r{border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:9px}
+.ah-h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.ah-h b{flex:1 1 auto}
+.pill.seam{background:repeating-linear-gradient(45deg,transparent,transparent 4px,
+  var(--grid) 4px,var(--grid) 5px)}
+
+/* ---- key status ---- */
+.keys{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.keychip{font-size:11.5px;border:1px solid var(--border);border-radius:5px;padding:3px 8px;
+  color:var(--muted);display:inline-flex;align-items:center;gap:5px}
+.keychip::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--muted)}
+.keychip.on{color:var(--ink-2)}
+.keychip.on::before{background:#15803d}
 </style>
 </head>
 <body>
@@ -182,6 +292,7 @@ footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
   <div>
     <h1>AEO Monitor <span id="brand"></span></h1>
     <div class="meta" id="runmeta">loading…</div>
+    <div class="keys" id="keys"></div>
   </div>
   <div class="actions" id="actions">
     <button id="btnrun" class="primary">Run live collection</button>
@@ -372,30 +483,147 @@ function method(s, d) {
   </section>`;
 }
 
-function recommendations(s) {
-  const top = (s.domains || []).filter(d => !d.is_owned).slice(0, 3).map(d => d.domain);
-  const rivals = (s.competitors || []).slice(0, 3).map(c => c.name);
-  return `<section>
-    <h2>What I would do about it</h2>
-    <p class="sub">Written from this run's data. Replace with your own before sending —
-      these are the shape of the recommendation, not the recommendation.</p>
-    <ol class="recs">
-      <li><b>Go where the answers are grounded, not where you wish they were.</b>
-        ${top.length ? `The answers cite <b>${top.map(esc).join("</b>, <b>")}</b> most often.`
-                     : "Rank the cited domains once there is a run behind this."}
-        Almost none of that is your own site, so the work is closer to digital PR and
-        third-party placement than to on-site SEO.</li>
-      <li><b>Fix the branded queries first.</b> If an assistant is unreliable on your own
-        name, nothing further up the funnel is worth optimising yet.</li>
-      <li><b>Attack the category query.</b> Being absent where buyers ask "best…" is worth
-        more than incremental gains where you already appear.</li>
-      <li><b>Track the rivals who own the answer today.</b>
-        ${rivals.length ? `Currently <b>${rivals.map(esc).join("</b>, <b>")}</b>.` : ""}
-        Their citation sources are the target list.</li>
-      <li><b>Set the baseline before changing anything.</b> Run the same query set daily for
-        two weeks to establish the noise band, so the first real improvement is legible.</li>
-    </ol>
+/* ---- the headline number: a COUNT, never a percentage ---- */
+const STATE_LABEL = { cited: "cited", mentioned: "mentioned", absent: "absent",
+                      unmeasured: "not measured" };
+
+function benchmarkHero(b) {
+  if (!b || !b.out_of) return "";
+  const unm = (b.unmeasured || []).length;
+  return `<section class="bench">
+    <div class="bench-top">
+      <div class="bench-n">
+        <b>${b.appear_in}</b><span>of ${b.out_of}</span>
+      </div>
+      <div class="bench-txt">
+        <h2>We appear in ${b.appear_in} of ${b.out_of} buyer-intent queries</h2>
+        <p class="sub">Target is <b>${b.target} of ${b.target}</b>.
+          ${b.cited} earned a citation with a link; ${b.mentioned} were named with no link.
+          Reported as a count, not a percentage — a percentage hides its denominator,
+          and the denominator is where these dashboards go wrong.
+          ${unm ? `<b class="warn-t">${unm} of the ${b.out_of} were not measured on this
+            run and are excluded from the count, not scored as losses.</b>` : ""}</p>
+        <p class="sub">Branded queries are deliberately <b>not</b> in the ten — asking
+          "what is Nebius Academy" and counting the answer would be free marks.</p>
+      </div>
+    </div>
+    <div class="bench-rows">
+      ${b.rows.map(r => `<div class="br s-${esc(r.state)}">
+        <span class="br-s">${esc(STATE_LABEL[r.state] || r.state)}</span>
+        <span class="br-q">${esc(r.query)}</span>
+        <span class="br-i">${esc(r.intent)}</span>
+      </div>`).join("")}
+    </div>
   </section>`;
+}
+
+/* ---- where competitors get cited and we do not ---- */
+function sourceGap(g) {
+  if (!g || !g.kinds || !g.kinds.length) {
+    return `<section><h2>The source gap</h2>
+      <p class="sub">No citations recorded on the lost queries yet.</p></section>`;
+  }
+  return `<section>
+    <h2>What the answers cite instead — and what kind of thing it is</h2>
+    <p class="sub">Across the <b>${g.lost_queries}</b> queries we lost. This is the half that
+      turns a scoreboard into a to-do list: knowing we lose a query is not actionable,
+      knowing the answers to it lean on review platforms and two competitor blogs names
+      the places to go and get placed. <b>The classification is a lookup, not a model
+      call</b> — a source type that changed its mind between runs would make every
+      recommendation unreproducible.</p>
+    <div class="kinds">
+      ${g.kinds.map(k => `<div class="kind ${k.we_appear ? "ours" : ""}">
+        <div class="kind-h"><b>${esc(k.label)}</b>
+          <span>${k.citations} citation${k.citations === 1 ? "" : "s"}</span></div>
+        <div class="kind-w">${k.we_appear ? "We appear here." : "We do not appear here."}</div>
+        <div class="kind-d">${k.top_domains.map(d =>
+          `<span>${esc(d.domain)} <i>${d.n}</i></span>`).join("")}</div>
+      </div>`).join("")}
+    </div>
+  </section>`;
+}
+
+/* ---- does SEO feed AEO? measured, not asserted ---- */
+function seoPanel(s) {
+  if (!s || !s.queries_compared) return "";
+  return `<section>
+    <h2>Does SEO feed AEO?</h2>
+    <p class="sub">Everyone in this category asserts an answer. Here it is measured: of the
+      domains Google's AI Overview <b>cited</b>, how many were also ranking organically for
+      the same query, captured from the same response.</p>
+    <div class="tiles">
+      <div class="tile"><b>${s.overlap_pct == null ? "—" : s.overlap_pct + "%"}</b>
+        <span>Cited domains also ranking</span>
+        <small>${s.also_ranking_organically} of ${s.cited_domains} cited domains appeared
+          in the organic results too</small></div>
+      <div class="tile"><b>${s.queries_compared}</b><span>Queries compared</span>
+        <small>only AI Overviews exposes both the answer and the SERP beneath it</small></div>
+    </div>
+    ${s.verdict
+      ? `<div class="note"><b>${esc(s.verdict)}</b></div>`
+      : `<div class="note warn"><b>Too few queries to call it.</b> Reported with the sample
+         size attached rather than as a figure, because on a handful of queries this number
+         swings hard and a single percentage would be read as settled.</div>`}
+  </section>`;
+}
+
+/* ---- the written recommendations. Loaded separately: they cost a model call,
+       and the measured half of the page must render instantly and for free. ---- */
+function recsPanel(r) {
+  if (!r) return `<section id="recs-sec">
+    <h2>Recommendations</h2>
+    <p class="sub">Written from the measured evidence above — the benchmark, the source
+      gap and the overlap figure — not from the raw answers. A model handed raw answers
+      returns five generic bullets that would be identical for any company in any
+      category; a model handed a table it cannot argue with has to be specific.</p>
+    <button id="btnrecs">Generate recommendations</button>
+    <div id="recs-out"></div></section>`;
+  if (r.error) return `<div class="note warn"><b>Recommendations unavailable.</b>
+    ${esc(r.error)}</div>`;
+  return `${(r.recommendations || []).map((x, i) => `<div class="rec">
+      <div class="rec-h"><span class="rec-n">${i + 1}</span>
+        <b>${esc(x.title)}</b>
+        <span class="rec-m">${esc(x.effort)} effort · ${esc(x.horizon)}</span></div>
+      <p>${esc(x.why)}</p>
+      <div class="rec-ev">${(x.evidence || []).map(e => `<span>${esc(e)}</span>`).join("")}</div>
+      <div class="rec-me"><b>Measure with:</b> ${esc(x.measure_with)}</div>
+    </div>`).join("")}
+    ${r.seo_verdict ? `<div class="note"><b>SEO → AEO, on this evidence:</b>
+      ${esc(r.seo_verdict)}</div>` : ""}`;
+}
+
+/* ---- ask one query live. NOT written into the benchmark tables. ---- */
+function adhocPanel() {
+  return `<section id="adhoc-sec">
+    <h2>Ask an ad-hoc query</h2>
+    <p class="sub">Runs live against every enabled engine right now.
+      <b>Deliberately not persisted.</b> The ten queries are a fixed measurement contract
+      and a trend line only means something if the question set behind it did not move —
+      so a curious one-off runs, renders, and is gone.</p>
+    <div class="lf">
+      <input id="ah-q" placeholder='e.g. "who should we buy AI training from in Europe"'>
+      <button id="ah-go">Ask</button>
+    </div>
+    <div id="ah-out"></div>
+  </section>`;
+}
+
+function adhocResults(d) {
+  return `<div class="ah-res">
+    ${d.results.map(r => `<div class="ah-r">
+      <div class="ah-h"><b>${esc(r.label)}</b>
+        <span class="pill s-${esc(r.status)}">${esc(STATE_LABEL[r.status] || r.status)}</span>
+        ${r.live ? "" : '<span class="pill seam">seam</span>'}</div>
+      ${r.note ? `<div class="why">${esc(r.note)}</div>` : ""}
+      ${r.error ? `<div class="why warn-t">${esc(r.error)}</div>` : ""}
+      ${r.answer ? `<div class="draft">${esc(r.answer)}</div>` : ""}
+      ${r.citations && r.citations.length
+        ? `<div class="kind-d">${r.citations.map(c =>
+            `<span>${esc(c.domain)}</span>`).join("")}</div>` : ""}
+    </div>`).join("")}
+    <div class="note"><b>Not saved.</b> This answer is not in the database and does not
+      affect the ${"" + 10} of 10 count.</div>
+  </div>`;
 }
 
 function render(d, t) {
@@ -416,8 +644,10 @@ function render(d, t) {
 
   $("#app").innerHTML =
     synthBanner +
+    benchmarkHero(d.benchmark) +
     tiles(s) +
     grid(d) +
+    sourceGap(d.source_gap) +
     `<div class="two">` +
       bars("Where the answers come from",
            "Domains the assistants actually cited. This is the lever: the ones you don't own are the placement target.",
@@ -426,9 +656,11 @@ function render(d, t) {
            "Names appearing in the answers, seeded plus discovered from cited domains.",
            s.competitors, "appearances", "name") +
     `</div>` +
+    seoPanel(d.seo) +
+    recsPanel(null) +
+    adhocPanel() +
     trend(t) +
     method(s, d) +
-    recommendations(s) +
     (d.stale_contract
       ? `<div class="note warn"><b>This run used a different query set from the current config.</b>
          It is shown, but it is not comparable with the latest runs.</div>` : "");
@@ -437,26 +669,96 @@ function render(d, t) {
 /* -------------------------------------------------- Track A — lead engine */
 
 const ROUTE_LABEL = {
-  sales_now: "Sales · 5 min", sdr_queue: "SDR queue · 24h", nurture: "Nurture",
+  hot: "Hot · 5 min", warm: "Warm · 24h", revisit_6mo: "Revisit in 6 months",
   hold: "Hold", disqualified: "Disqualified", needs_review: "Human review",
+  capped: "Not processed · spend cap",
+};
+
+const RECON_LABEL = {
+  verified: "verified against the email domain",
+  weak: "weak match — company name only, website differs",
+  mismatch: "MISMATCH — probably a different person",
+  thin: "nothing found to reconcile",
 };
 
 function leadTiles(s) {
   return `<div class="tiles">
     <div class="tile"><b>${s.total}</b><span>Leads processed</span>
-      <small>end to end: enrich → qualify → score → route → draft</small></div>
-    <div class="tile"><b>${s.routes.sales_now || 0}</b><span>Straight to sales</span>
-      <small>fit and intent both clear the bar — 5-minute SLA</small></div>
+      <small>end to end: look up → reconcile → score → route → draft</small></div>
+    <div class="tile"><b>${s.routes.hot || 0}</b><span>Hot</span>
+      <small>fit AND intent both clear the bar — 5-minute SLA</small></div>
     <div class="tile"><b>${s.disqualified}</b><span>Disqualified</span>
       <small>checked before scoring, and absolute</small></div>
     <div class="tile"><b>${s.needs_review}</b><span>Human review</span>
-      <small>couldn't be enriched — not the same as scoring badly</small></div>
+      <small>couldn't be looked up, or didn't reconcile — not the same as scoring badly</small></div>
+  </div>`;
+}
+
+/* The form. This is the whole point of the tab: type a real person, watch it
+   go and find them. It posts to /api/leads/one, which runs the SAME pipeline
+   as the batch button with a one-item list. */
+function leadForm() {
+  const SIGNALS = [
+    ["completed_assessment", "Completed the AI readiness assessment", 25],
+    ["booked_demo", "Booked a demo", 30],
+    ["pricing_page", "Visited pricing", 15],
+    ["webinar_attended", "Attended a webinar", 12],
+    ["webinar_registered", "Registered for a webinar (didn't attend)", 6],
+    ["content_download", "Downloaded content", 5],
+  ];
+  return `<section id="leadform-sec">
+    <h2>Look up a real lead</h2>
+    <p class="sub">Name, surname and a work email. Serper finds the LinkedIn profile,
+      two Apify actors read the person and the company, and the record is
+      <b>reconciled against the email domain</b> before anything is scored — because the
+      top search hit for a common name is a different real person often enough that an
+      unchecked record would be confidently wrong rather than blank.
+      Costs about <b>$0.025</b> per lookup.</p>
+    <div class="lf">
+      <input id="lf-first" placeholder="First name" autocomplete="off">
+      <input id="lf-last" placeholder="Surname" autocomplete="off">
+      <input id="lf-email" placeholder="work@company.com" autocomplete="off">
+      <button id="lf-go" class="primary">Find, score &amp; draft</button>
+    </div>
+    <div class="lf-sig">
+      <span class="lf-lbl">First-party behaviour (optional, and this is what decides hot):</span>
+      ${SIGNALS.map(([k, label, pts]) =>
+        `<label><input type="checkbox" value="${k}"> ${esc(label)} <i>+${pts}</i></label>`).join("")}
+    </div>
+    <div class="note"><b>Leave every box unticked and this lead cannot go hot, however
+      good the company is.</b> That is the intent gate working, not a bug — we would know
+      who they are and nothing about whether they want anything. Tick <i>Booked a demo</i>
+      on the same person and watch the route change.</div>
+    <div id="lf-out"></div>
+  </section>`;
+}
+
+function painPoints(l) {
+  if (!l.pain_points || !l.pain_points.length) return "";
+  return `<div class="pp">
+    <div class="pp-h">Inferred pain points <i>— the model's reading of the evidence,
+      not facts about the account</i></div>
+    ${l.pain_points.map(p => `<div class="pp-r">
+      <span class="conf c-${esc(p.confidence)}">${esc(p.confidence)}</span>
+      <div><b>${esc(p.pain)}</b><span>${esc(p.evidence)}</span></div>
+    </div>`).join("")}
   </div>`;
 }
 
 function leadCard(l) {
   const bd = (l.breakdown || []).map(r =>
     `<span>${esc(r.factor)}: ${esc(r.detail)} <b>+${r.points}</b></span>`).join("");
+
+  /* Gaps are rendered SEPARATELY from the score and never as "+0". A factor we
+     could not measure and a factor that measured zero are different claims. */
+  const gaps = (l.gaps || []).length
+    ? `<div class="gaps"><b>Not scored — and not scored as zero:</b>
+        ${l.gaps.map(g => `<span>${esc(g.factor)}: ${esc(g.why)}</span>`).join("")}</div>` : "";
+
+  const rec = l.reconciliation && l.reconciliation.verdict
+    ? `<div class="recon v-${esc(l.reconciliation.verdict)}">
+         <b>${esc(RECON_LABEL[l.reconciliation.verdict] || l.reconciliation.verdict)}</b>
+         ${l.reconciliation.detail ? `<span>${esc(l.reconciliation.detail)}</span>` : ""}</div>` : "";
 
   const draft = l.message
     ? `<div class="draft">${esc(l.message)}</div>
@@ -466,20 +768,27 @@ function leadCard(l) {
        </div>`
     : (l.error ? `<div class="why">${esc(l.error)}</div>` : "");
 
+  const growth = l.headcount_growth
+    ? ` · headcount ${esc(l.headcount_growth)}` : "";
+
   return `<div class="lead">
     <div class="lead-head">
       <div class="lead-who">
         <b>${esc(l.name || l.email)}</b>
+        ${l.linkedin_url ? `<a class="li" href="${esc(l.linkedin_url)}" target="_blank" rel="noopener">profile ↗</a>` : ""}
         <span>${esc(l.title || "—")}${l.company ? " · " + esc(l.company) : ""}
-          ${l.headcount ? " · " + l.headcount.toLocaleString() + " staff" : ""} · ${esc(l.email)}</span>
+          ${l.headcount ? " · " + l.headcount.toLocaleString() + " staff" : ""}${growth} · ${esc(l.email)}</span>
       </div>
       <div class="lead-right">
-        ${l.score != null ? `<div class="score">${l.score} <small>pts · intent ${l.intent}</small></div>` : ""}
+        ${l.score != null ? `<div class="score">${l.score} <small>pts · intent ${l.intent == null ? "—" : l.intent}</small></div>` : ""}
         <span class="pill r-${esc(l.route)}">${esc(ROUTE_LABEL[l.route] || l.route)}</span>
       </div>
     </div>
+    ${rec}
     ${bd ? `<div class="bd">${bd}</div>` : ""}
+    ${gaps}
     <div class="why">${esc(l.disqualified || l.route_why || "")}</div>
+    ${painPoints(l)}
     ${draft}
   </div>`;
 }
@@ -582,8 +891,18 @@ function renderLeads(d) {
        That is a mail-merge with a name in it. The model is asked to declare which
        record fields it leaned on, so this is checkable rather than assumed.</div>` : "";
 
+  const redacted = d.redacted
+    ? `<div class="note"><b>Personal fields are redacted in this export.</b> Track A
+       scrapes real people, and this file is meant to be shared — so names, work emails,
+       profile URLs and the drafted messages are stripped, while everything needed to
+       judge the method survives: the score, every point that made it, the routing and
+       its reasoning, the reconciliation verdict and the company firmographics.
+       Run the app locally to see the unredacted records.</div>` : "";
+
   $("#app").innerHTML =
     leadTiles(s) +
+    redacted +
+    (EMBED ? "" : leadForm()) +
     `<section>
       <h2>Every lead, and why it went where it went</h2>
       <p class="sub">Enrichment, then disqualification, then scoring, then routing, then the
@@ -609,14 +928,44 @@ function renderLeads(d) {
         on the total alone and sent someone who registered for a webinar and never attended
         straight to sales on a five-minute SLA, earned purely on headcount and job title.
         A big company with the right title is not a buying signal.</div>
+      <div class="note warn"><b>Search only ever proposes.</b> The top result for a common
+        name is a different real person often enough that accepting it unchecked would
+        attach a stranger's career to a real lead — and it would score <i>well</i>, not
+        badly, because every field would look complete. Every record is reconciled against
+        the email domain, which is the one fact no search engine suggested to us. A
+        mismatch goes to a human and never reaches the scorer.</div>
+      <div class="note"><b>Financials are never guessed.</b> Revenue, valuation and funding
+        are not obtainable for most private companies, and a model asked for them returns a
+        fluent, specific, unfalsifiable number. They are recorded as explicit unknowns worth
+        zero points. <b>Headcount growth is the real proxy</b> — and because LinkedIn
+        publishes today's number and no history, it is <i>measured</i> across two sightings
+        rather than looked up, so it reads "not yet measured" on first contact instead of
+        drawing a 0% that looks flat.</div>
     </section>`;
 }
 
 /* ------------------------------------------------------------------ load */
 
 let TAB = "aeo";
+let CONFIG = null;
+
+/* Which credentials are present, and what each one turns on. PRESENCE ONLY —
+   the value is never sent to the browser, so this is safe to leave on screen
+   during a recorded walkthrough. It is also the answer to "can someone else run
+   this?": add a key to .env, restart, the chip goes green and the seam closes. */
+function keyChips(keys) {
+  if (!keys || !keys.length) return;
+  const el = $("#keys");
+  if (!el) return;
+  el.innerHTML = keys.map(k =>
+    `<span class="keychip ${k.present ? "on" : ""}" title="${esc(k.unlocks)}">
+       ${esc(k.name)} ${k.present ? "set" : "not set"}</span>`).join("");
+}
 
 async function load() {
+  if (!EMBED && !CONFIG) {
+    try { CONFIG = await api("/api/config"); keyChips(CONFIG.keys); } catch (e) { /* offline export */ }
+  }
   if (TAB === "leads") {
     const d = EMBED ? EMBED.leads : await api("/api/leads");
     if (!d || d.empty) {
@@ -687,11 +1036,89 @@ if (!EMBED) {
   $("#actions").innerHTML = '<button id="btntheme">Theme</button>';
 }
 
-document.addEventListener("click", e => {
-  if (e.target && e.target.id === "btntheme") {
+/* One delegated handler for everything rendered after load. The panels are
+   re-created on every render, so binding directly would go stale. */
+document.addEventListener("click", async e => {
+  const t = e.target;
+  if (!t) return;
+
+  if (t.id === "btntheme") {
     const dark = document.documentElement.getAttribute("data-theme") === "dark";
     document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+    return;
   }
+
+  /* ---- Track A: look up one real person ---- */
+  if (t.id === "lf-go") {
+    const email = $("#lf-email").value.trim();
+    const out = $("#lf-out");
+    if (!email.includes("@")) {
+      out.innerHTML = `<div class="note warn"><b>A work email is required.</b> The domain is
+        the only fact the reconciliation check can trust — it is the one thing a search
+        engine did not propose to us.</div>`;
+      return;
+    }
+    t.disabled = true; t.textContent = "Looking up…";
+    out.innerHTML = `<div class="empty">Serper → LinkedIn profile → company page →
+      reconcile → score → draft. About 20 seconds.</div>`;
+    try {
+      const body = {
+        first_name: $("#lf-first").value, last_name: $("#lf-last").value, email,
+        signals: [...document.querySelectorAll(".lf-sig input:checked")].map(i => i.value),
+      };
+      const r = await api("/api/leads/one",
+        { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body) });
+      out.innerHTML = r.error
+        ? `<div class="note warn"><b>Lookup failed.</b> ${esc(r.error)}</div>`
+        : (r.lead ? leadCard(r.lead) : '<div class="note warn">No lead returned.</div>');
+    } catch (err) {
+      out.innerHTML = `<div class="note warn">${esc(String(err))}</div>`;
+    }
+    t.disabled = false; t.textContent = "Find, score & draft";
+    return;
+  }
+
+  /* ---- Track C: ad-hoc live query ---- */
+  if (t.id === "ah-go") {
+    const q = $("#ah-q").value.trim();
+    if (!q) return;
+    t.disabled = true; t.textContent = "Asking…";
+    $("#ah-out").innerHTML = '<div class="empty">asking every enabled engine…</div>';
+    try {
+      const r = await api("/api/adhoc",
+        { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: q }) });
+      $("#ah-out").innerHTML = r.error
+        ? `<div class="note warn">${esc(r.error)}</div>` : adhocResults(r);
+    } catch (err) {
+      $("#ah-out").innerHTML = `<div class="note warn">${esc(String(err))}</div>`;
+    }
+    t.disabled = false; t.textContent = "Ask";
+    return;
+  }
+
+  /* ---- Track C: generate the written recommendations ---- */
+  if (t.id === "btnrecs") {
+    t.disabled = true; t.textContent = "Writing…";
+    $("#recs-out").innerHTML = '<div class="empty">reading the benchmark, the source gap ' +
+      'and the overlap figure…</div>';
+    try {
+      const r = await api("/api/recommendations");
+      $("#recs-out").innerHTML = recsPanel(r);
+    } catch (err) {
+      $("#recs-out").innerHTML = `<div class="note warn">${esc(String(err))}</div>`;
+    }
+    t.disabled = false; t.textContent = "Regenerate";
+  }
+});
+
+/* Enter submits the field it is in. */
+document.addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  const id = e.target && e.target.id;
+  if (id === "ah-q") $("#ah-go").click();
+  if (id === "lf-first" || id === "lf-last" || id === "lf-email") $("#lf-go").click();
 });
 
 load();

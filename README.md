@@ -1,10 +1,20 @@
-# AEO Monitor
+# Nebius Growth Engine
 
-Measures how a brand appears inside AI assistants and generative search, and turns
-that into something you can act on.
+Two working prototypes for the Nebius Academy Growth Marketing Engineer take-home,
+in one app with two tabs.
 
-Built for the Nebius Academy take-home, Track C. Runs locally, stores history in
-SQLite, and exports a self-contained HTML report that needs no server and no keys.
+**Track C — Agent Engine Optimization.** Measures how Nebius Academy appears inside AI
+assistants against a fixed set of ten buyer-intent queries, reports it as a count
+(*"we appear in 3 of 10"*, target 10 of 10), works out what the answers that beat us
+cite instead, and turns that into concrete recommendations.
+
+**Track A — inbound lead engine.** Type a real person's name, surname and work email.
+It finds their actual LinkedIn profile, reads their company, scores them on real
+firmographics, routes them hot / warm / revisit-in-6-months, and drafts a first-touch
+message off inferred pain points.
+
+Everything below runs against live APIs. Where something is mocked, it is marked in
+the data, not just in a caption.
 
 ---
 
@@ -12,185 +22,224 @@ SQLite, and exports a self-contained HTML report that needs no server and no key
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env          # add ANTHROPIC_API_KEY (and APIFY_TOKEN if you have one)
+cp .env.example .env          # ANTHROPIC_API_KEY, APIFY_TOKEN, SERPER_API_KEY
 
-python -m aeo.run             # collect once
-uvicorn web.app:app --reload  # dashboard at http://127.0.0.1:8000
+python scripts/probe.py                     # FIRST. one call per integration, PASS/FAIL
+uvicorn web.app:app --reload                # http://127.0.0.1:8000
 ```
 
-The dashboard's **Run live collection** button does the same thing from the browser
-and streams progress, so a walkthrough shows real data arriving rather than a
-screenshot of it.
+Then press **Run live collection** (Track C) or **Run lead engine** (Track A), or type a
+real person into the Track A form.
 
 ```bash
-python scripts/seed_synthetic.py --weeks 3   # marked backfill, so the trend view has a shape
-python -m aeo.report                         # -> out/aeo_report.html (one file, no server)
+python -m aeo.run                     # one full collection (12 queries)
+python -m aeo.run --limit 3           # a few cents, for when you're changing things
+python -m aeo.report                  # -> out/aeo_report.html, one file, no server
+python scripts/seed_synthetic.py --weeks 3     # marked backfill, so the trend has a shape
+python scripts/seed_synthetic.py --snapshots   # marked prior headcount, so growth computes
 ```
 
-**Nothing installed and no keys?** It still runs. Every engine degrades to a declared
-seam and the dashboard renders them as seams — which is the point (see below).
+**No keys?** It still runs. Every engine degrades to a declared seam and the dashboard
+draws them as seams — which is the point.
 
 ---
 
-## What it does
+## Start with the probe
+
+`scripts/probe.py` makes **exactly one call per integration** and prints PASS/FAIL with
+the actual data shape.
+
+It exists because the code in this repo was originally written against documentation
+and had never been executed. A mocked prototype and a broken integration look identical
+from the outside — both render a dashboard full of plausible cells — and the difference
+only surfaces on camera. The probe found four real faults on first contact:
+
+| What it caught | Why it mattered |
+|---|---|
+| **Claude routed its searches through the code-execution tool**, so answers came back with **zero citations attached** | 6,326 characters of confident answer and nothing to parse. Every cell would have read *mentioned*, never *cited*, and citation share — the actionable metric — would have sat at a flat 0% that reads as a finding rather than a broken instrument |
+| `apify-client` 3.x renamed `timeout_secs` → `run_timeout`, and `call()` returns a `Run` object, not a dict | Both engines and both scrapers were dead on arrival and had never been run |
+| **harvestapi takes `queries`, not `profileUrls`** | Handed the wrong key it accepted the run, charged for it, and returned **zero items with no error** — indistinguishable from "this person has no profile" |
+| `apify~google-search-scraper` rejects any spend cap under $0.50 | A global cost cap cannot serve every actor |
+
+The rule: **nothing gets built on an unverified adapter**, and anything that fails twice
+becomes a marked seam within thirty minutes rather than being debugged into the deadline.
+
+---
+
+## Track C — how it works
 
 ```
-config/queries.yaml   the measurement contract — queries, brand aliases, competitors
+config/queries.yaml   the measurement contract — 10 benchmark queries + 2 controls
         │
         ▼
 aeo/engines.py        Claude (web search) · Google AI Overviews (Apify) · 2 seams
         │             every engine returns the same shape
         ▼
-aeo/analyze.py        tier the mention · extract cited domains · find competitors
-        │
+aeo/analyze.py        tier the mention · cited domains · competitors · benchmark ·
+        │             source gap · SEO/AEO overlap
         ▼
 aeo/db.py             SQLite: runs / observations / citations / competitors
         │
-        ├── web/app.py        local dashboard, live collection, export
+        ├── aeo/recommend.py    evidence in, recommendations out
+        ├── web/app.py          dashboard, live collection, ad-hoc query, export
         └── .github/workflows/aeo.yml   daily cron → the baseline
 ```
 
-## Three decisions worth arguing about
+### Reported as a count, not a percentage
 
-**1. Appearing is not binary.** *Cited* (the answer carried a link to us) and
-*mentioned* (named, no link) need different fixes, so they are different states.
-Collapsing them into "we appeared" throws away the actionable half.
+**"We appear in 3 of 10."** A percentage hides its denominator, and the denominator is
+where these dashboards go wrong — 30% reads identically whether it is 3 of 10 measured
+or 3 of 10 with four cells never looked at. A count forces the denominator onto the
+page, and turns the target from "improve visibility" into "we lose these seven specific
+questions, and here is who wins them instead".
 
-**2. The cited domains are the output.** AI answers ground on third-party sources,
-so the lever is usually **not** your own site. Ranking the domains the answers
-actually cite converts a dashboard into a list of places to go and get placed —
-closer to digital PR than to on-site SEO.
+⚠️ **Branded queries are not in the ten.** Asking *"what is Nebius Academy"* and counting
+the answer is free marks. They are asked and reported as controls — if we ever lose our
+own name nothing else matters — but they are a sanity check, not the score.
 
-**3. No composite 0–100 visibility score.** Every commercial tool in this category
-ships one. One number that moves for reasons you cannot recover is worse than three
-you can act on, so presence rate, citation share and the competitor set are reported
-separately and never blended.
+### Four decisions worth arguing about
 
-## Two things it refuses to fake
+**1. Appearing is not binary.** *Cited* (the answer carried a link) and *mentioned*
+(named, no link) need different fixes, so they are different states. Collapsing them
+into "we appeared" throws away the actionable half.
 
-**A seam is not an absence.** An engine with no credential is recorded as
-`unmeasured`, excluded from every rate, and drawn as a hatched cell. "We did not
-look" and "we looked and found nothing" are different findings and must never look
-alike — a rate whose denominator quietly includes unmeasured cells is exactly the
-error this tool exists to catch elsewhere.
+**2. The cited domains are the output.** AI answers ground on third-party sources, so
+the lever is usually **not** your own site. On a real run, **67 of 69 citations across
+the lost queries came from third-party roundups and 2 from any vendor's own site.**
+That converts a dashboard into a list of places to go and get placed — closer to
+digital PR than to on-site SEO.
+
+**3. No composite 0–100 visibility score.** Every commercial tool in this category ships
+one. One number that moves for reasons you cannot recover is worse than three you can
+act on, so presence, citation share and the competitor set are reported separately.
+
+**4. Does SEO feed AEO — measured, not asserted.** The AI Overviews response carries the
+organic SERP alongside the generative answer, so the tool compares the domains the AI
+*cited* against the domains *ranking* for the same query. Reported with its sample size
+attached, because on a handful of queries that number swings hard.
+
+### Two things it refuses to fake
+
+**A seam is not an absence.** An engine with no credential is recorded as `unmeasured`,
+excluded from every rate, and drawn hatched. "We did not look" and "we looked and found
+nothing" are different findings and must never look alike. On a real run, one Google AI
+Overviews repeat returned no overview at all — recorded as unmeasured, not as an absence.
 
 **Invented history is marked in the data, not the caption.** You cannot know what an
-assistant said last month; no API returns it. Backfill is flagged
-`runs.is_synthetic = 1` in the database, so no chart can render it as measured
-history by accident. It also draws as a shaded column with a warning beneath.
+assistant said last month; no API returns it. Backfill is flagged `runs.is_synthetic = 1`
+in the database, so no chart can render it as measured history by accident.
 
-## The instrument checks itself
+### The instrument checks itself
 
-Assistant answers are non-deterministic. Ask the same question twice and the
-competitor set can change, so **a single snapshot is a sample, not a measurement**
-— and a monitor built on one sample reports noise as signal.
+Assistant answers are non-deterministic, so **a single snapshot is a sample, not a
+measurement**. A subset of queries is asked more than once, disagreement is stored
+rather than averaged away, and the dashboard reports how many cells contradicted
+themselves. Movement smaller than that spread is not a result.
+`runs.query_set_hash` fingerprints the measurement contract, so changing the queries
+breaks the trend line instead of pretending the two halves are comparable.
 
-So a subset of queries is asked more than once (`run.repeats`), disagreement is
-stored rather than averaged away, and the dashboard reports how many cells
-contradicted themselves. Movement smaller than that spread is not a result.
-Production would run five repeats and report a confidence band.
+### The ad-hoc query is deliberately not saved
 
-`runs.query_set_hash` fingerprints the measurement contract. Change the queries and
-the trend line breaks instead of pretending the two halves are comparable.
+Ask anything live on the Track C tab. It runs against every enabled engine and renders
+— and is **not** written into the benchmark tables. The ten queries are a fixed
+contract; a trend line only means something if the question set behind it did not move.
 
 ---
 
-## Track A — inbound lead engine (second tab)
+## Track A — how it works
 
-```bash
-python -c "from aeo import leads; leads.collect()"
 ```
-Or the **Run lead engine** button on the Track A tab.
+name + surname + work email
+        │
+        ▼  Serper:  site:linkedin.com/in "Name" "Company"        1 query
+        ▼  Apify:   harvestapi/linkedin-profile-scraper          1 call
+        ▼  Apify:   harvestapi/linkedin-company                  1 call
+        ▼
+   RECONCILE against the email domain  ──▶ verified | weak | mismatch | thin
+        │
+        ▼  disqualify → score (rules) → route → infer pain points + draft (model)
+```
 
-A raw form fill goes in; an enriched, scored, routed lead with a drafted first touch
-comes out. Five sample leads, five different outcomes — every branch is exercised.
+About **$0.025 and 20 seconds per lead.**
 
-**Rules decide, the model writes.** Scoring is arithmetic over `config/leads.yaml`.
-Ask an LLM to score a lead out of 100 and you get a confident number it cannot
-reproduce twice and nobody can audit. The model's job is the one thing rules genuinely
-cannot do: write a sentence that sounds like a person. Every point in the score shows
-where it came from.
+### Rules decide, the model writes
 
-**Disqualifiers run before scoring, and they are absolute.** A strong firmographic
-profile must never outvote "personal email, no company". Letting a disqualified lead
-win on points is the commonest way one of these quietly poisons a pipeline.
+Scoring is arithmetic over `config/leads.yaml`. Ask an LLM to score a lead out of 100
+and you get a confident number it cannot reproduce twice and nobody can audit. The model
+does the two things rules genuinely cannot: infer what this company's AI-adoption
+problem probably is, and write a sentence that sounds like a person. Every point in the
+score shows where it came from.
 
-**Unenrichable is not low-scoring.** A lead we could not look up routes to a human, not
-to the bottom of the list — the same seam-versus-absence rule the AEO side uses. It
-matters more here, because nobody goes looking for the leads that never arrived.
+### 🔑 Search only ever proposes
 
-**The draft must cite its evidence.** The model returns which record fields it used. A
-draft citing nothing is a mail-merge in costume, and the dashboard counts those.
+The top hit for a common name is a **different real person** often enough that accepting
+it unchecked would attach a stranger's career to a real lead. And it would score *well*,
+not badly — every field would be complete and plausible. So a record is only accepted if
+it reconciles against the **email domain**, the one fact no search engine suggested to
+us. A mismatch routes to a human and never reaches the scorer.
 
-### Enrichment: mocked here, and this is the production plan
+### Financials are never guessed
 
-**Waterfall, cheapest source first, stop at the first match.** No single B2B provider
-exceeds roughly **70% match rate** on a real inbound list; chaining three to five lifts
-it to **85–95%**. That gap is the whole argument — a single provider means one lead in
-three arrives blank, and if blanks score as zeroes you are systematically binning a
-third of your inbound. It is also why `needs_review` exists: at 85–95%, about one lead
-in ten still won't resolve, and that one needs a human, not a low number.
+Revenue, valuation and funding are not obtainable for most private companies, and a
+model asked for them returns a fluent, specific, unfalsifiable number. They are named in
+`never_guessed` and recorded as explicit unknowns worth **zero points**.
 
-| Step | Gives | Cost | Why it sits there |
-|---|---|---|---|
-| First-party form | email, company as typed, self-declared role, assessment answers | free | Ours, and more current than anything purchasable |
-| Domain heuristics | domain, free-provider detection, MX validity | free | Catches disqualifiers before spending a credit |
-| Apollo.io | firmographics, headcount, industry, title | free tier → ~$49/user/mo | Widest cheap coverage, strongest in North America |
-| Cognism | EU firmographics, phone-verified contacts, consent/DNC | enterprise | The EU step, and not optional — see below |
-| Clay | orchestration across 100+ sources | from ~$185/mo | Replaces a hand-built chain past ~3 providers |
+**Headcount growth is the real proxy** — and LinkedIn publishes today's number with no
+history, so it is *measured across two sightings* rather than looked up. Each run writes
+a timestamped `company_snapshots` row; growth computes on the second sighting. Until
+then it reads "not yet measured" rather than drawing a 0% that looks flat.
 
-**Cognism is in there for a specific reason.** Nebius Academy is expanding into Europe,
-where enrichment and outbound sit under GDPR legitimate interest. Cognism ships DNC
-screening and lawful-basis documentation rather than leaving you to argue it afterwards.
-US-centric providers have both thinner EU coverage and thinner compliance posture.
+### Unknown is not zero
 
-**Fields, and how each is verified**, are in `config/leads.yaml` and rendered on the
-dashboard. Two rules drive the list: headcount is **banded, never exact**, because
-providers disagree by 2–3× and an exact figure makes the score move when the vendor
-updates rather than when the company does; and seniority is **derived from the title by
-our own rules**, never imported from a vendor's seniority field, because every taxonomy
-differs and importing one couples our score to their definitions.
+A factor we could not measure is listed in `gaps` — never scored as zero and never
+silently dropped. "We looked and this company is not growing" and "we have never looked"
+are different claims, and a dashboard that renders both as a missing row teaches the
+reader to treat absence as a negative finding.
 
-### Two bugs the sample set caught
+### Three bugs the live runs caught
 
 **`intern` matched inside "no INTERNal training capability"** and disqualified a real
-L&D Manager. Substring matching, failing silently toward rejection. Now word-boundary
-matched — the same class of bug as `usa` inside `Lausanne`.
+L&D Manager. Substring matching, failing silently toward rejection. Word-boundary
+matched now.
 
-**Fit alone routed a no-intent lead to sales on a five-minute SLA.** Someone who
-registered for a webinar and never attended, earning the slot purely on headcount,
-seniority and industry. Fit and intent are separate gates now; a big company with the
-right job title is not a buying signal.
+**Fit alone routed a no-intent lead to sales on a five-minute SLA** — a webinar
+registrant who never attended, earning the slot purely on headcount, seniority and
+industry. Fit and intent are separate gates now. You can watch this work: look a person
+up cold and they cannot go hot however good the company is; tick *booked a demo* on the
+same person and the score goes 84 → 139 and the route goes warm → hot.
+
+**The seniority list had no C-suite row.** It named only the L&D buying committee —
+CHRO, CLO, CTO — so *"Chairman and CEO"* matched nothing and scored zero on seniority.
+SAP's CEO came out below a mid-level L&D manager. Invisible against fixture data,
+because the fixtures only ever contained the titles the list was written for. It was
+the `gaps` list that made it visible: the rule did not fail loudly, it failed by
+omitting a row.
 
 ---
 
-## Answering the three questions
+## Costs and caps
 
-**How I'd measure impact.** Baseline first: the same query set, daily, for two weeks,
-to establish the noise band — without it there is no way to tell an improvement from
-a re-roll. Then three metrics, separately: **presence rate** (any appearance),
-**cited rate** (appearances that earn a link), and **citation share** (our sources as
-a fraction of all cited sources). The leading indicator is citation share on the
-category queries; the lagging one is AI-referred sessions in analytics, which will
-stay near zero long after citations start moving.
+| | |
+|---|---|
+| One lead | ~$0.025 — 1 Serper query + 2 Apify calls |
+| One full Track C run | roughly $0.60–0.90 in Claude + ~$0.20 Apify |
+| The probe | under five cents |
 
-**How I'd scale it.** What breaks at 10× is the engine calls, not the analysis: this
-is one request per query per engine per repeat, run serially. Fan out with a worker
-pool and a per-engine rate limiter, move the store from SQLite to Postgres, and cache
-answers by content hash so a re-run doesn't re-buy an unchanged answer. Next builds,
-in order: the two seam engines made live; an LLM extraction pass for competitor
-discovery, which currently only finds rivals cited from their own domains; per-market
-query sets (DE/PL/NL), since AI answers are locale-sensitive and this measures one
-locale only; and alerting on movement outside the noise band rather than a dashboard
-someone has to remember to open.
+**A retry loop against a paid actor is real money**, so caps live in `aeo/cost.py` and
+are set in `config/leads.yaml`. Three layers: a per-provider call counter, Apify's own
+server-side `max_total_charge_usd`, and a per-call timeout. Hitting a cap **raises and
+is reported** — a capped run that silently returns fewer results is indistinguishable
+from a thin day.
 
-**One tradeoff, and what production would do differently.** ChatGPT and Perplexity are
-**mocked** — no keys on this account. I chose to make the seam explicit rather than
-quietly report a smaller matrix, because a missing engine that looks like an absence
-would corrupt every rate on the page. Each is one function with the same signature as
-the live ones; it is a credential gap, not a design gap. The second tradeoff is the
-locale: one query set, one market. Both were scope calls against the four-hour cap,
-not discoveries.
+## No scraped personal data leaves the machine
+
+`data/*.db` is gitignored and stays that way. `out/` too.
+
+`python -m aeo.report` **redacts by default**: names, work emails, profile URLs and the
+drafted messages are stripped from the exported HTML, while everything needed to judge
+the method survives — the score, every point that made it, the routing and its
+reasoning, the reconciliation verdict, the company firmographics. Pass
+`--include-personal` to override, consciously.
 
 ---
 
@@ -198,16 +247,21 @@ not discoveries.
 
 | Path | What it is |
 |---|---|
-| `config/queries.yaml` | queries, brand aliases, products, competitor seeds, engines, repeats |
+| `CONTEXT.md` | the standing brief — assignment, deadline, constraints |
+| `scripts/probe.py` | **step 0** — one call per integration, PASS/FAIL + real shapes |
+| `config/queries.yaml` | the measurement contract: 10 benchmark queries + 2 controls |
+| `config/leads.yaml` | the qualification policy: ICP, disqualifiers, routing, caps |
 | `aeo/engines.py` | one adapter per surface, common return shape |
-| `aeo/analyze.py` | mention tiers, cited domains, competitors, aggregation |
-| `aeo/db.py` | SQLite schema and access |
-| `aeo/run.py` | the collector (`python -m aeo.run`) |
-| `aeo/report.py` | standalone HTML export (`python -m aeo.report`) |
-| `web/app.py` + `web/static/index.html` | local dashboard, single file, no build step |
-| `scripts/seed_synthetic.py` | marked backfill |
-| `.github/workflows/aeo.yml` | daily cron |
+| `aeo/analyze.py` | mention tiers, benchmark, source gap, SEO overlap |
+| `aeo/enrich.py` | Track A: Serper → Apify person → Apify company → reconcile |
+| `aeo/leads.py` | Track A: disqualify → score → route → draft |
+| `aeo/cost.py` | every call that spends money, and the caps on it |
+| `aeo/recommend.py` | evidence in, 3–5 recommendations out |
+| `aeo/db.py` | SQLite schema, including `company_snapshots` |
+| `aeo/report.py` | standalone HTML export, redacted by default |
+| `web/app.py` + `web/static/index.html` | dashboard, single file, no build step |
+| `scripts/seed_synthetic.py` | marked backfill — AEO history and prior headcount |
 
-Secrets live in `.env` (gitignored) and in GitHub Actions secrets. A secret not
-listed under `env:` in the workflow never reaches the run, and fails as a silent
-zero rather than an error.
+Secrets live in `.env` (gitignored) and in GitHub Actions secrets. A secret not listed
+under `env:` in the workflow never reaches the run, and fails as a silent zero rather
+than an error.

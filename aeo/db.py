@@ -48,7 +48,11 @@ CREATE TABLE IF NOT EXISTS observations (
     brand_rank      INTEGER,                   -- order of first appearance among named brands
     answer_chars    INTEGER,
     answer_excerpt  TEXT,
-    error           TEXT
+    error           TEXT,
+    -- The organic SERP domains for the same query, where the surface exposes them
+    -- (AI Overviews only). Kept so "does SEO feed AEO" is a query against measured
+    -- data rather than an opinion. JSON list of domains.
+    serp_domains    TEXT
 );
 
 CREATE TABLE IF NOT EXISTS citations (
@@ -104,10 +108,41 @@ CREATE TABLE IF NOT EXISTS leads (
     disqualified    TEXT,                       -- reason, or NULL
     message         TEXT,
     evidence        TEXT,                       -- JSON: which facts the draft used
-    error           TEXT
+    error           TEXT,
+    -- real-enrichment columns ------------------------------------------------
+    linkedin_url    TEXT,
+    headcount_growth TEXT,                      -- '+12% over 34d', or NULL = unknown
+    reconciliation  TEXT,                       -- JSON: verified | weak | mismatch | thin
+    unknowns        TEXT,                       -- JSON: enrichment fields we never got
+    gaps            TEXT,                       -- JSON: SCORING factors we could not measure
+    pain_points     TEXT,                       -- JSON: inferred by the model, from evidence
+    trace           TEXT                        -- JSON: what the lookup actually did
 );
 
 CREATE INDEX IF NOT EXISTS ix_leads_run   ON leads(run_id);
+
+-- 🔑 The growth proxy, and the reason it is a TABLE and not a column.
+--
+-- LinkedIn publishes what a company is today and keeps no public history —
+-- `peopleStats` looked like it might carry a series and does not; it is a breakdown
+-- of where current staff sit. So headcount growth cannot be read from one scrape at
+-- any price.
+--
+-- It can be MEASURED, though, by writing down what we saw and looking again later.
+-- One row per company per sighting; growth is computed on the second one. Until a
+-- company has two rows its growth is `unknown` and scores ZERO — declared, never a
+-- zero that reads as "flat". Exactly the same discipline as runs.is_synthetic on the
+-- AEO side: the honest answer to "we cannot know this yet" is to say so in the data.
+CREATE TABLE IF NOT EXISTS company_snapshots (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    domain          TEXT    NOT NULL,
+    observed_at     TEXT    NOT NULL,
+    headcount       INTEGER,
+    company_name    TEXT,
+    source          TEXT    NOT NULL DEFAULT 'linkedin'
+);
+
+CREATE INDEX IF NOT EXISTS ix_snap_domain ON company_snapshots(domain, observed_at);
 
 CREATE INDEX IF NOT EXISTS ix_obs_run     ON observations(run_id);
 CREATE INDEX IF NOT EXISTS ix_obs_query   ON observations(query_id, engine);
@@ -136,11 +171,40 @@ def init(path: Path | None = None) -> None:
         conn.executescript(SCHEMA)
 
 
+# Columns added after the first release. `CREATE TABLE IF NOT EXISTS` does exactly
+# nothing to a table that already exists, so a database created by an earlier version
+# silently keeps its old shape and then fails on INSERT with "no such column" —
+# halfway through a paid run, which is the worst possible moment.
+#
+# The alternative was "delete data/aeo.db and start again", and that is a bad
+# instruction to put in a README: this file holds the company_snapshots that the
+# headcount-growth proxy depends on, and those cannot be re-fetched — a snapshot is a
+# reading of a moment that has passed. Losing them resets the only history the tool
+# accumulates.
+_ADDED_COLUMNS = {
+    "observations": [("serp_domains", "TEXT")],
+    "leads": [("linkedin_url", "TEXT"), ("headcount_growth", "TEXT"),
+              ("reconciliation", "TEXT"), ("unknowns", "TEXT"), ("gaps", "TEXT"),
+              ("pain_points", "TEXT"), ("trace", "TEXT")],
+}
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    for table, cols in _ADDED_COLUMNS.items():
+        have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        if not have:
+            continue        # table not created yet; SCHEMA will make it correctly
+        for name, decl in cols:
+            if name not in have:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+
+
 @contextmanager
 def session(path: Path | None = None):
     conn = connect(path)
     try:
         conn.executescript(SCHEMA)
+        _migrate(conn)
         yield conn
         conn.commit()
     finally:
@@ -175,11 +239,12 @@ def finish_run(conn: sqlite3.Connection, run_id: int, notes: str | None = None) 
 
 
 def record_observation(conn: sqlite3.Connection, run_id: int, obs: dict) -> None:
+    import json as _json
     conn.execute(
         "INSERT INTO observations "
         "(run_id, query_id, query_text, intent, engine, is_live, repeat_n, status, "
-        " brand_rank, answer_chars, answer_excerpt, error) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        " brand_rank, answer_chars, answer_excerpt, error, serp_domains) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             run_id,
             obs["query_id"],
@@ -193,6 +258,7 @@ def record_observation(conn: sqlite3.Connection, run_id: int, obs: dict) -> None
             obs.get("answer_chars"),
             obs.get("answer_excerpt"),
             obs.get("error"),
+            _json.dumps(obs.get("serp_domains") or []),
         ),
     )
 
@@ -298,13 +364,14 @@ def finish_lead_run(conn: sqlite3.Connection, run_id: int, notes: str | None = N
                  (now(), notes, run_id))
 
 
-def record_lead(conn: sqlite3.Connection, run_id: int, lead: dict) -> None:
+def record_lead(conn: sqlite3.Connection, run_id: int, lead: dict) -> int:
     import json as _json
-    conn.execute(
+    cur = conn.execute(
         "INSERT INTO leads (run_id, email, name, company, domain, source, enriched, "
         " industry, headcount, seniority, job_function, title, score, breakdown, "
-        " route, route_why, sla_minutes, disqualified, message, evidence, error) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " route, route_why, sla_minutes, disqualified, message, evidence, error, "
+        " linkedin_url, headcount_growth, reconciliation, unknowns, gaps, pain_points, trace) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             run_id, lead["email"], lead.get("name"), lead.get("company"),
             lead.get("domain"), lead.get("source"), int(lead.get("enriched", 0)),
@@ -313,8 +380,41 @@ def record_lead(conn: sqlite3.Connection, run_id: int, lead: dict) -> None:
             _json.dumps(lead.get("breakdown") or []), lead["route"],
             lead.get("route_why"), lead.get("sla_minutes"), lead.get("disqualified"),
             lead.get("message"), _json.dumps(lead.get("evidence") or []), lead.get("error"),
+            lead.get("linkedin_url"), lead.get("headcount_growth"),
+            _json.dumps(lead.get("reconciliation") or {}),
+            _json.dumps(lead.get("unknowns") or []),
+            _json.dumps(lead.get("gaps") or []),
+            _json.dumps(lead.get("pain_points") or []),
+            _json.dumps(lead.get("trace") or []),
         ),
     )
+    return int(cur.lastrowid)
+
+
+# --- the growth proxy ------------------------------------------------------
+
+def record_snapshot(conn: sqlite3.Connection, *, domain: str, headcount: int | None,
+                    company_name: str | None, source: str = "linkedin") -> None:
+    conn.execute(
+        "INSERT INTO company_snapshots (domain, observed_at, headcount, company_name, source) "
+        "VALUES (?,?,?,?,?)", (domain, now(), headcount, company_name, source))
+
+
+def prior_snapshot(conn: sqlite3.Connection, domain: str,
+                   min_age_days: int = 7) -> dict | None:
+    """The most recent snapshot at least `min_age_days` old.
+
+    ⚠️ The age floor is the point. Two readings taken an hour apart differ by scraper
+    noise and rounding, not by hiring, and dividing by a tiny elapsed time turns that
+    noise into a huge annualised "growth rate". Same argument as the AEO side's noise
+    band: movement smaller than the measurement spread is not a result.
+    """
+    row = conn.execute(
+        "SELECT * FROM company_snapshots WHERE domain = ? AND headcount IS NOT NULL "
+        "AND observed_at <= datetime('now', ?) ORDER BY observed_at DESC LIMIT 1",
+        (domain, f"-{int(min_age_days)} days"),
+    ).fetchone()
+    return dict(row) if row else None
 
 
 def latest_lead_run_id(conn: sqlite3.Connection) -> int | None:
@@ -336,7 +436,12 @@ def leads(conn: sqlite3.Connection, run_id: int) -> list[dict]:
     out = []
     for r in rows:
         d = dict(r)
-        d["breakdown"] = _json.loads(d.get("breakdown") or "[]")
-        d["evidence"] = _json.loads(d.get("evidence") or "[]")
+        for col, empty in (("breakdown", "[]"), ("evidence", "[]"), ("unknowns", "[]"),
+                           ("gaps", "[]"), ("pain_points", "[]"), ("trace", "[]"),
+                           ("reconciliation", "{}")):
+            try:
+                d[col] = _json.loads(d.get(col) or empty)
+            except (TypeError, ValueError):
+                d[col] = _json.loads(empty)
         out.append(d)
     return out

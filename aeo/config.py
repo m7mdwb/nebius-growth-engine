@@ -29,6 +29,9 @@ class Query:
     id: str
     text: str
     intent: str
+    # In the headline "N of 10" benchmark? Branded controls are asked and reported
+    # but excluded — see the note at the top of config/queries.yaml.
+    benchmark: bool = True
 
 
 @dataclass
@@ -122,7 +125,8 @@ def load(path: Path | None = None) -> Config:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     cfg = Config(raw=raw)
     cfg.queries = [
-        Query(id=q["id"], text=q["text"], intent=q.get("intent", "unclassified"))
+        Query(id=q["id"], text=q["text"], intent=q.get("intent", "unclassified"),
+              benchmark=bool(q.get("benchmark", True)))
         for q in raw.get("queries", [])
     ]
     return cfg

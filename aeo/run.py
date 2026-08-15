@@ -22,11 +22,23 @@ def _noop(_: dict) -> None:
 
 
 def collect(cfg: config.Config | None = None, *, label: str = "manual",
-            on_progress: Progress = _noop) -> int:
+            on_progress: Progress = _noop, limit: int | None = None,
+            only_engine: str | None = None, queries: list | None = None) -> int:
+    """Walk queries x engines x repeats and store every answer.
+
+    `limit` and `only_engine` exist so the pipeline can be exercised for a few cents
+    while it is being changed. ⚠️ A limited run writes a real run row, and its
+    benchmark is therefore genuinely "N of 10 with 7 unmeasured" — which the benchmark
+    reports rather than hides. Do not use one as a headline figure.
+    """
     cfg = cfg or config.load()
 
-    engine_names = [n for n in ENGINES if cfg.engine_enabled(n)]
-    units = [(q, cfg.repeats_for(q)) for q in cfg.queries]
+    engine_names = [n for n in ENGINES if cfg.engine_enabled(n)
+                    and (only_engine is None or n == only_engine)]
+    qs = queries if queries is not None else cfg.queries
+    if limit:
+        qs = qs[:limit]
+    units = [(q, cfg.repeats_for(q)) for q in qs]
     total_steps = sum(r for _, r in units) * len(engine_names)
 
     with db.session() as conn:
@@ -68,6 +80,7 @@ def collect(cfg: config.Config | None = None, *, label: str = "manual",
                         "answer_chars": obs["answer_chars"],
                         "answer_excerpt": obs["answer_excerpt"] or obs.get("note"),
                         "error": obs["error"],
+                        "serp_domains": obs.get("serp_domains") or [],
                     })
                     if obs["citations"]:
                         db.record_citations(conn, run_id, [
@@ -109,6 +122,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Run one AEO collection.")
     ap.add_argument("--label", default="manual", help="run label, e.g. scheduled")
     ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--limit", type=int, help="only the first N queries (cheap test run)")
+    ap.add_argument("--engine", help="only this engine, e.g. claude")
     args = ap.parse_args()
 
     def echo(ev: dict) -> None:
@@ -122,7 +137,8 @@ def main() -> int:
                   f"{ev['status']:<9} {ev['citations']:>2} cites  "
                   f"{ev['query'][:46]}{flag}", flush=True)
 
-    run_id = collect(label=args.label, on_progress=echo)
+    run_id = collect(label=args.label, on_progress=echo,
+                     limit=args.limit, only_engine=args.engine)
     print(f"\ndone. run_id={run_id}")
     print("dashboard:  uvicorn web.app:app --reload   ->  http://127.0.0.1:8000")
     return 0
