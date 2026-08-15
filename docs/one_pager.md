@@ -31,11 +31,10 @@ contacted inside five minutes. Biggest single lever on inbound conversion.
 
 - **Drafts citing zero facts.** The model declares which record fields each message leaned
   on; a draft citing nothing is a mail-merge in costume. This is how "personalised" stays
-  checkable instead of taken on trust.
-- **`needs_review` rate** — leads that could not be looked up or did not reconcile. Nobody
-  goes looking for the leads that never arrived, so this is the number that rots quietly.
-- **Reconciliation mismatches** — each one is a lead that would otherwise have been scored
-  as somebody else.
+  checkable rather than taken on trust.
+- **`needs_review` rate** and **reconciliation mismatches** — leads that could not be
+  looked up, or whose profile did not match the email domain. Nobody goes looking for the
+  leads that never arrived, so these rot quietly.
 - **The honest counterfactual is a holdout:** route a random 10% the old manual way and
   compare meeting-booked rate, or any lift gets credited to the scoring model when someone
   merely replied faster.
@@ -53,15 +52,14 @@ neither SQLite nor the arithmetic is near a limit.
   rivals cited from their own domains), **per-market query sets for DE/NL/PL** since AI
   answers are locale-sensitive and Europe is the expansion, and **alerting on movement
   outside the noise band** rather than a dashboard someone must remember to open.
-- **Track A (500 leads/week):** at the measured **$0.06 a lead that is ~$30/week — cost is
+- **Track A (500 leads/week):** at the measured $0.06 a lead that is ~$30/week — **cost is
   not the constraint, accuracy is.** No single B2B provider exceeds ~70% match rate on a
-  real inbound list; chaining three to five lifts it to 85–95%, and one provider means one
-  lead in three arrives blank. **Cognism next specifically**, because European enrichment
+  real inbound list, so one provider means one lead in three arrives blank; chaining three
+  to five lifts it to 85–95%. **Cognism next specifically**, because European enrichment
   and outbound sit under GDPR legitimate interest — that stopped being a slide the moment
   this prototype started scraping real people. Then queue the enrichment (a form
-  submission currently blocks on three HTTP calls, and the retry policy is exactly where a
-  paid actor becomes a runaway bill), and **write back to the CRM** — scoring is worthless
-  if sales must open a separate dashboard to see it.
+  submission currently blocks on three HTTP calls) and **write back to the CRM** — scoring
+  is worthless if sales must open a separate dashboard to see it.
 
 ## 3. One tradeoff, and what production would do differently
 
@@ -84,12 +82,9 @@ discussed but never linked.
 
 ---
 
-**Why building beat diagramming.** Zero real API calls had been made against this codebase
-before I started — every adapter was written from documentation and never executed. Live
-runs found five faults, and **four of the five fail silently**, producing plausible output
-rather than an error: Claude returning confident answers with zero parseable citations;
-two Apify adapters dead on a renamed argument; a wrong input key making a paid scraper
-return zero items indistinguishable from "no profile exists"; seniority rules with no
-C-suite row, so a CEO scored zero; and answers truncating at the token ceiling, biasing an
-instrument whose whole job is counting who gets named. None of those are visible in a
-workflow diagram.
+**Why building beat diagramming.** Every adapter here was written from documentation and
+had never been executed. Running it found five faults, and **four fail silently** —
+plausible output, no error: Claude answering with zero parseable citations; two Apify
+adapters dead on a renamed argument; a wrong input key making a paid scraper return zero
+items, indistinguishable from "no profile exists"; seniority rules with no C-suite row, so
+a CEO scored zero. None are visible in a workflow diagram.
