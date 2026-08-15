@@ -83,12 +83,27 @@ def classify(result: EngineResult, cfg: Config) -> dict:
     # cell nobody read would put a fabricated negative into the table and let
     # every downstream rate quietly count it — the precise failure this tool
     # is built to detect in other people's dashboards.
-    if not result.is_live:
+    # ⚠️ An ERRORED or EMPTY live engine is UNMEASURED too, not absent.
+    #
+    # This was a real hole, found the hard way: the Anthropic credit balance ran out
+    # partway through an 80-step run, and twenty observations came back as API errors
+    # with no answer text. They were stored with status `absent` — "we asked and we
+    # were not there" — when the truth was "we never got an answer". Every rate
+    # excludes errored rows, so the headline numbers were right, but the stored status
+    # was a lie waiting for the first consumer that forgot to filter on `error`.
+    #
+    # An empty answer from a live engine gets the same treatment for the same reason.
+    # A refusal, a timeout, a dry response: none of them are evidence of absence.
+    if not result.is_live or result.error or not (result.answer or "").strip():
+        note = result.note
+        if result.is_live and not result.error and not (result.answer or "").strip():
+            note = note or "engine returned an empty answer — recorded as unmeasured, " \
+                           "because nothing was read and absence was not observed"
         return {
             "status": UNMEASURED, "brand_rank": None, "products": [],
             "answer_chars": 0, "answer_excerpt": None,
             "citations": [], "competitors": [], "serp_domains": [],
-            "error": result.error, "note": result.note,
+            "error": result.error, "note": note,
         }
 
     text = result.answer or ""
