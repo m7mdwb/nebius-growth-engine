@@ -94,9 +94,29 @@ icp:
     - {match: ["operations", "strategy"], points: 8, label: Adjacent}
 
   industry:
+    # ⚠️ THESE TERMS MATCH A VENDOR'S TAXONOMY, NOT ENGLISH — and the gap between the
+    # two was silently zeroing four sectors this ICP explicitly targets.
+    #
+    # Caught by typing real companies in. `industry` does not arrive as prose, it
+    # arrives as a LinkedIn taxonomy label, and matching is word-boundary strict (see
+    # _match — the rule that stopped "intern" disqualifying an L&D Manager). So:
+    #
+    #   "Telecommunications"        did NOT match `telecom`     -> scored 0, not 15
+    #   "Hospitals and Health Care" did NOT match `healthcare`  -> scored 0, not 12
+    #   "Oil and Gas" / "Utilities" did NOT match `energy`      -> scored 0, not 12
+    #   "IT Services and IT Consulting" matched only `consulting` -> scored 8, not 15
+    #
+    # That last one is IBM, at 343,445 staff, filed as a professional-services firm.
+    # The failure mode is the nasty one: a lead that should score 77 scores 70 and
+    # still looks like a perfectly ordinary lead, so nobody goes looking. Word-boundary
+    # matching is right and stays; the terms have to be written as the labels that
+    # actually arrive. Rules are first-match-wins, so order matters — the technology
+    # row must sit above consulting, or every IT firm lands in the wrong one.
     - {match: [financial, banking, insurance, fintech], points: 15}
-    - {match: [technology, software, saas, telecom], points: 15}
-    - {match: [pharma, healthcare, manufacturing, energy, logistics], points: 12}
+    - {match: [technology, software, saas, telecom, telecommunications, computer,
+               it services, information technology], points: 15}
+    - {match: [pharma, healthcare, health care, hospital, manufacturing,
+               energy, oil and gas, utilities, logistics], points: 12}
     - {match: [consulting, professional services], points: 8}
 
   intent:

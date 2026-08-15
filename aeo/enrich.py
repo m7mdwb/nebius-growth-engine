@@ -414,6 +414,12 @@ def enrich(lead: dict, budget: Budget) -> dict:
             note(f"SEAM: person scraper refused — {exc}")
             rec["blocked"] = f"person scraper refused: {exc}"
             rec["unknowns"].append("person_record")
+        if rec["person"].get("source_actor"):
+            # WHICH scraper answered, in the stored trace. Two actors with different
+            # response shapes feed the same scorer, so when a field goes missing the
+            # first question is which one produced the row — and the answer should not
+            # require re-running the lookup to find out.
+            note(f"person record from {rec['person']['source_actor']}")
         if not rec["person"] and not rec.get("blocked"):
             note("profile page returned nothing")
             rec["unknowns"].append("person_record")

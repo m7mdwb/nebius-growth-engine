@@ -353,8 +353,12 @@ def score(lead: dict, enriched: dict, fit: FitDefinition,
         else:
             gap("Seniority", f"'{title}' matches no seniority rule")
 
-    fn_text = f"{enriched.get('function') or ''} {title} {enriched.get('headline') or ''}"
-    label, pts = function_of(fn_text, fit)
+    # ⚠️ Match on the RAW FACTS only — the title and the headline. `enriched["function"]`
+    # is a label this codebase already derived from those same two fields, and feeding a
+    # derived label back in as text to match against means renaming a label could silently
+    # change a score. It is idempotent today; it is a trap the first time somebody edits
+    # a label in leads.yaml to read more nicely on screen.
+    label, pts = function_of(f"{title} {enriched.get('headline') or ''}", fit)
     if label:
         total += pts
         rows.append({"factor": "Function", "detail": label, "points": pts})
