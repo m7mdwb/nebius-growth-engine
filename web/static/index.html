@@ -276,6 +276,59 @@ footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
 .pill.seam{background:repeating-linear-gradient(45deg,transparent,transparent 4px,
   var(--grid) 4px,var(--grid) 5px)}
 
+/* ---- Track A · Logic flowchart ---- */
+.flegend{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px}
+.lg{font-size:11.5px;padding:2px 9px;border-radius:20px;border:1px solid var(--border);
+  color:var(--ink-2);display:inline-flex;align-items:center;gap:6px}
+.lg::before{content:"";width:9px;height:3px;border-radius:2px;background:var(--muted)}
+.lg.k-free::before{background:#94a3b8}
+.lg.k-paid::before{background:#b45309}
+.lg.k-rules::before{background:var(--series-1)}
+.lg.k-model::before{background:#7c3aed}
+.lg.k-exit::before{background:#15803d}
+
+.flow{position:relative;display:flex;flex-direction:column;gap:0}
+.fstage{display:flex;gap:12px;padding:13px 14px 13px 12px;border:1px solid var(--border);
+  border-left:4px solid var(--muted);border-radius:8px;background:var(--surface);
+  position:relative;margin-bottom:4px}
+/* the spine: a short connector drawn between consecutive stages */
+.fstage::after{content:"";position:absolute;left:24px;bottom:-14px;width:2px;height:14px;
+  background:var(--border);z-index:0}
+.fstage:last-child::after{display:none}
+.fstage.k-free{border-left-color:#94a3b8}
+.fstage.k-paid{border-left-color:#b45309}
+.fstage.k-rules{border-left-color:var(--series-1)}
+.fstage.k-model{border-left-color:#7c3aed;background:var(--surface-2)}
+.fnum{flex:0 0 auto;width:23px;height:23px;border-radius:50%;background:var(--surface-2);
+  border:1px solid var(--border);color:var(--ink-2);font-size:11.5px;font-weight:700;
+  display:grid;place-items:center;font-variant-numeric:tabular-nums}
+.fbody{flex:1 1 auto;min-width:0}
+.fhead{display:flex;align-items:baseline;gap:9px}
+.fhead b{font-size:14px}
+.fcount{font-size:11.5px;font-variant-numeric:tabular-nums;background:var(--surface-2);
+  border:1px solid var(--border);border-radius:11px;padding:1px 8px;color:var(--ink-2);
+  flex:0 0 auto}
+.fsub{font-size:13px;color:var(--ink-2);margin-top:3px}
+.fnote{font-size:12.5px;color:var(--muted);margin-top:6px;padding-left:10px;
+  border-left:2px solid var(--grid);max-width:88ch}
+.fnote b{color:var(--ink-2)}
+
+/* branch-offs: indented, so the eye reads them as leaving the spine */
+.fexit{display:flex;align-items:baseline;gap:8px;margin:0 0 8px 34px;padding:7px 11px;
+  border:1px dashed var(--border);border-radius:7px;font-size:12.5px;background:var(--surface-2)}
+.farrow{color:var(--muted);font-family:ui-monospace,Menlo,monospace;flex:0 0 auto}
+.fexit-l{font-weight:600;color:var(--ink)}
+.fexit-w{color:var(--muted);font-size:12px}
+.fexit.t-dq{border-color:#b91c1c66}
+.fexit.t-rev{border-color:#7c3aed66}
+.fexit.t-hot{border-color:#15803d;border-style:solid}
+.fexit.t-warm{border-color:#a1620788}
+.froutes{margin-bottom:6px}
+@media(max-width:640px){
+  .fexit{margin-left:12px;flex-wrap:wrap}
+  .fnote{max-width:none}
+}
+
 /* ---- key status ---- */
 .keys{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .keychip{font-size:11.5px;border:1px solid var(--border);border-radius:5px;padding:3px 8px;
@@ -302,8 +355,9 @@ footer{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.7}
 </header>
 
 <nav class="tabs" id="tabs">
-  <button data-tab="aeo" class="on">Track C — AI visibility</button>
-  <button data-tab="leads">Track A — Inbound lead engine</button>
+  <button data-tab="leads" class="on">Track A — Inbound lead engine</button>
+  <button data-tab="flow">Track A · Logic</button>
+  <button data-tab="aeo">Track C — AI visibility</button>
 </nav>
 
 <section id="runpanel">
@@ -960,9 +1014,113 @@ function renderLeads(d) {
     </section>`;
 }
 
+/* ------------------------------------- Track A · Logic — the live flowchart */
+
+/* Not a picture of the design — a picture of the LAST RUN. Every node carries
+   the count that actually went through it, so the diagram and the code cannot
+   drift apart: if a branch never fires, its node reads 0 and says so. A static
+   flowchart in a README is a claim; this is the same claim with evidence. */
+function flowChart(d) {
+  const L = d.leads || [];
+  const n = f => L.filter(f).length;
+  const routes = (d.summary && d.summary.routes) || {};
+
+  const total     = L.length;
+  const personal  = n(l => l.route === "disqualified" && !l.linkedin_url && !l.headcount);
+  const disqOther = (routes.disqualified || 0) - personal;
+  const recon     = k => n(l => (l.reconciliation || {}).verdict === k);
+  const mismatch  = recon("mismatch") + recon("thin");
+  const scored    = n(l => l.score != null);
+  const drafted   = n(l => l.message);
+
+  /* kind drives the left accent + legend: what KIND of step is this?
+     The whole argument of Track A is that these are different kinds of thing
+     and the expensive/fallible ones are fenced off from the deciding ones. */
+  const stage = (num, kind, title, sub, count, note) => `
+    <div class="fstage k-${kind}">
+      <div class="fnum">${num}</div>
+      <div class="fbody">
+        <div class="fhead"><b>${title}</b>
+          ${count != null ? `<span class="fcount">${count}</span>` : ""}</div>
+        <div class="fsub">${sub}</div>
+        ${note ? `<div class="fnote">${note}</div>` : ""}
+      </div>
+    </div>`;
+
+  const exit = (label, count, why, tone) => `
+    <div class="fexit t-${tone || ""}">
+      <span class="farrow">└─▶</span>
+      <span class="fexit-l">${esc(label)}</span>
+      <span class="fcount">${count}</span>
+      <span class="fexit-w">${why}</span>
+    </div>`;
+
+  return `<section>
+    <h2>How a lead becomes a decision</h2>
+    <p class="sub">The live pipeline, with the counts from the last run on every node —
+      not an illustration of it. If a branch never fires it reads <b>0</b> here, so the
+      diagram cannot quietly drift away from the code it describes.
+      <b>Read the left edge:</b> the colour is what <i>kind</i> of step it is, and the
+      whole design is about keeping those kinds apart — the fallible steps
+      (search, scrape, model) are fenced off from the deciding steps (rules).</p>
+
+    <div class="flegend">
+      <span class="lg k-free">free</span>
+      <span class="lg k-paid">paid call</span>
+      <span class="lg k-rules">rules — deterministic</span>
+      <span class="lg k-model">model</span>
+      <span class="lg k-exit">terminal route</span>
+    </div>
+
+    <div class="flow">
+      ${stage(1, "free", "Inbound lead", "Name, surname, work email. Behaviour (assessment, demo, webinar) rides along as first-party signals.", total,
+        "The email <b>domain</b> is the only fact here that no search engine proposed to us. Everything downstream is checked against it.")}
+
+      ${stage(2, "free", "Domain heuristics", "Free-mail detection, before a single credit is spent.", null,
+        "A personal mailbox has no company behind it, so the paid lookups are <b>skipped, not spent proving it</b>.")}
+      ${exit("Disqualified — personal mailbox", personal, "0 paid calls made", "dq")}
+
+      ${stage(3, "paid", "Serper → LinkedIn profile", '<code>site:linkedin.com/in "Name" "Company"</code> — the hop between a name and a URL.', null,
+        "~$0.001. ⚠️ This only ever <b>proposes</b>: the top hit for a common name is a different real person often enough to matter.")}
+
+      ${stage(4, "paid", "Apify — person, then company", "Structured current position and employer; then employeeCount, industry, HQ, description.", null,
+        "~$0.02 for both. The person record hands us the employer's own LinkedIn URL, which is a better company key than anything we could guess.")}
+
+      ${stage(5, "rules", "Reconcile against the email domain", "Does the scraped company's own website match the domain the lead typed?", null,
+        "🔑 <b>The step that makes everything after it trustworthy.</b> An unreconciled record is not a blank — it is a stranger's career attached to a real name, and it would score <i>well</i>, not badly, because every field looks complete.")}
+      ${exit("Human review — mismatch or nothing found", mismatch, "never reaches the scorer", "rev")}
+
+      ${stage(6, "rules", "Disqualifiers", "Blocked roles, excluded industries, headcount floor. Absolute, and checked before scoring.", null,
+        "A strong firmographic profile must never outvote a hard exclusion — letting it is the commonest way one of these quietly poisons a pipeline.")}
+      ${exit("Disqualified — rule hit", Math.max(disqOther, 0), "not a low score; not a lead", "dq")}
+
+      ${stage(7, "rules", "Score — arithmetic, not a prompt", "Headcount · headcount growth · seniority · function · industry · intent. Every point shows its source.", scored,
+        "Ask a model to score a lead out of 100 and you get a confident number it cannot reproduce twice and no salesperson can argue with. Unmeasurable factors go to <b>gaps</b> — never scored as zero.")}
+
+      ${stage(8, "rules", "Route — two gates, not one", "Fit says <i>worth talking to</i>. Intent says <i>now</i>. Both, or it isn't now.", null,
+        "⚠️ Routing on the total alone once sent a webinar no-show to sales on a 5-minute SLA, earned purely on headcount and job title.")}
+      <div class="froutes">
+        ${exit("Hot · 5 min", routes.hot || 0, "fit ≥ 70 AND intent ≥ 25", "hot")}
+        ${exit("Warm · 24h", routes.warm || 0, "fit ≥ 45", "warm")}
+        ${exit("Revisit in 6 months", routes.revisit_6mo || 0, "fit ≥ 20, no buying signal yet", "rev6")}
+        ${exit("Hold", routes.hold || 0, "insufficient fit; kept for re-testing", "hold")}
+      </div>
+
+      ${stage(9, "model", "The two things rules cannot do", "Infer this company's likely AI-adoption problem, then write a sentence a person would write.", drafted,
+        "The <b>only</b> model call in the pipeline. It must declare which record fields it leaned on — a draft citing nothing is a mail-merge in costume, and the dashboard counts those.")}
+    </div>
+
+    <div class="note"><b>Everything above the model step is reproducible.</b> Same lead,
+      same config, same score and same route — every time. The model never touches the
+      number, the routing or the SLA; it writes prose from a decision that was already
+      made. That is the line the whole design is drawn around, and it is why the score
+      can be argued with.</div>
+  </section>`;
+}
+
 /* ------------------------------------------------------------------ load */
 
-let TAB = "aeo";
+let TAB = "leads";
 let CONFIG = null;
 
 /* Which credentials are present, and what each one turns on. PRESENCE ONLY —
@@ -982,13 +1140,17 @@ async function load() {
   if (!EMBED && !CONFIG) {
     try { CONFIG = await api("/api/config"); keyChips(CONFIG.keys); } catch (e) { /* offline export */ }
   }
-  if (TAB === "leads") {
+  if (TAB === "leads" || TAB === "flow") {
     const d = EMBED ? EMBED.leads : await api("/api/leads");
     if (!d || d.empty) {
-      $("#app").innerHTML = '<div class="empty">No lead run yet. Press <b>Run lead engine</b>.</div>';
+      $("#app").innerHTML = TAB === "flow"
+        ? '<div class="empty">No lead run yet — the flowchart shows counts from a real run. Press <b>Run lead engine</b>.</div>'
+        : '<div class="empty">No lead run yet. Press <b>Run lead engine</b>.</div>';
       return;
     }
-    renderLeads(d);
+    $("#app").innerHTML = "";
+    if (TAB === "flow") $("#app").innerHTML = flowChart(d);
+    else renderLeads(d);
     $("#runmeta").textContent = `lead run ${d.run.id} · ${d.run.started_at} · fit ${d.run.fit_hash}`;
     return;
   }
@@ -1018,7 +1180,8 @@ async function poll() {
   await load();
 }
 
-const runLabel = () => TAB === "leads" ? "Run lead engine" : "Run live collection";
+/* The Logic tab reads the same lead run, so its button runs the same thing. */
+const runLabel = () => TAB === "aeo" ? "Run live collection" : "Run lead engine";
 
 // Tabs work in the standalone export too, so a reviewer with no server can
 // still see both tracks.
@@ -1039,7 +1202,7 @@ if (!EMBED) {
     $("#btnrun").textContent = "Running…";
     $("#runpanel").classList.add("on");
     $("#log").textContent = "";
-    await api(TAB === "leads" ? "/api/leads/run" : "/api/run", { method: "POST" });
+    await api(TAB === "aeo" ? "/api/run" : "/api/leads/run", { method: "POST" });
     poll();
   };
   $("#btnexport").onclick = async () => {

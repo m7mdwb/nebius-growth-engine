@@ -633,6 +633,18 @@ def process(lead: dict, fit: FitDefinition, budget: Budget, conn) -> dict:
                     "unreconciled record is not a weak lead, it is a wrong one, so it "
                     "goes to a human rather than to the scorer.", sla=240)
 
+    # ⚠️ A REFUSED SCRAPER IS NOT A WEAK LEAD. Checked before the generic
+    # unenrichable branch so the reason survives: "our Apify plan ran out of runs"
+    # and "this person could not be found" produce identical-looking empty records,
+    # and only one of them is a fact about the lead. Conflating them would let a
+    # billing problem be recorded as a person's seniority.
+    if rec.get("blocked"):
+        return stop(UNENRICHED,
+                    f"SEAM — {rec['blocked']}. This is a fact about our tooling, not "
+                    "about this lead: the scraper refused before it ever looked. "
+                    "Nothing here is evidence of anything, so it goes to a human and "
+                    "is re-run once the block clears.", sla=240)
+
     if not enriched["enriched"]:
         # Not a low score. We did not manage to look this one up, and a lead we
         # know nothing about is a question for a human, not a number.

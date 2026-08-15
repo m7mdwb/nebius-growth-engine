@@ -38,6 +38,24 @@ class BudgetExhausted(RuntimeError):
     """The run hit a cap. Raised, never swallowed — the caller must report it."""
 
 
+class ActorRefused(RuntimeError):
+    """The actor ran, succeeded, and returned a refusal INSTEAD OF DATA.
+
+    ⚠️ This is the nastiest failure shape in the whole pipeline, and it cost a run
+    to find. harvestapi limits free Apify accounts to 20 runs, and on the 21st it
+    does not error — the run SUCCEEDS and the dataset contains one item:
+
+        {"error": "Free users are limited to 20 runs. Please upgrade..."}
+
+    So `items` is non-empty, every field mapping quietly yields None, and the lead
+    flows on to be scored as a person with "no job title found" — a *gap*, which
+    the scorer is designed to treat as an honest unknown. An account limit had been
+    laundered into a fact about the lead.
+
+    A refusal is not a thin record. It is raised, named, and routed to a human.
+    """
+
+
 @dataclass
 class Budget:
     """One per run. Not a module-level global, so a web request cannot inherit the
@@ -111,7 +129,17 @@ def apify_call(actor: str, run_input: dict, budget: Budget, *, what: str,
         run.get("defaultDatasetId") if hasattr(run, "get") else None)
     if not dataset_id:
         return []
-    return list(client.dataset(dataset_id).iterate_items())
+    items = list(client.dataset(dataset_id).iterate_items())
+
+    # A one-item dataset whose only content is an error is a refusal wearing the
+    # shape of a result. Catch it here, once, for every actor — the alternative is
+    # each adapter independently remembering to check, and one of them forgetting.
+    if len(items) == 1 and isinstance(items[0], dict):
+        only = items[0]
+        if set(only) <= {"error", "message", "status", "query", "input"} and (
+                only.get("error") or only.get("message")):
+            raise ActorRefused(str(only.get("error") or only.get("message"))[:200])
+    return items
 
 
 def serper_search(query: str, budget: Budget, *, what: str, count: int = 5) -> list[dict]:

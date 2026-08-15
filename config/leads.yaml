@@ -172,13 +172,15 @@ enrichment:
 
   # 🔑 Per-run cost caps. A retry loop against a paid actor is real money, and this
   # is the file where the number is set rather than buried next to the call.
-  # Measured on 2026-08-15: one lead costs 1 Serper query + 2 Apify calls = ~$0.025.
+  # Measured on 2026-08-15: one lead costs 1-2 Serper queries + 2 Apify calls = ~$0.026,
+  # plus ~$0.04 for the Anthropic draft. The second Serper query only fires when the
+  # person record arrives without its employer URL — see enrich.find_company_page.
   # The caps below therefore allow about five leads per run, which is a demo, not a
   # ration. Hitting a cap RAISES and is reported — a capped run that silently returns
   # fewer results is indistinguishable from a thin day.
   caps:
     apify_calls: 12
-    serper_calls: 8
+    serper_calls: 14
     apify_usd_per_call: 0.10
 
   # Ordered. Each entry only gets called if everything above it missed.

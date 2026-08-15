@@ -28,6 +28,44 @@ Two permissions in the brief that this build leans on directly: mocked pieces ar
 allowed **if the seam is clearly marked**, and AI use is expected rather than
 tolerated (*"How you use them is part of what we're evaluating"*).
 
+## 🚦 Where things stand — read this first
+
+**Anthropic credit topped up 15 Aug. `scripts/probe.py` = 5/5 PASS.** Both tracks run.
+
+### 🔴 ONE ACTION BLOCKS TRACK A, and it is a click
+
+**Apify's `harvestapi` person scraper caps free accounts at 20 runs. We are past it.**
+Company enrichment still works (separate per-actor count); *person* enrichment does not,
+so no lead can earn seniority or function points.
+
+**Fix: approve `dev_fusion` once, here —**
+`https://console.apify.com/actors/2SyF0bVxmgGr8IVCZ?approvePermissions=true`
+
+It wants full account access, which is why it was never enabled; it has no free-run cap.
+`enrich.PERSON_ACTORS` already tries it **first**, so approval is the whole fix — no code
+change. **Then re-run the lead engine**, because the run currently in the database was
+collected while the scraper was blocked and its scores are missing seniority (+25) and
+function (+12).
+
+⚠️ **Apify is a $5/month free plan and is the binding constraint on this whole project**
+— it funds Track A enrichment *and* the Track C AI Overviews engine. ~$1.63 used.
+Rehearse Track C with `--limit 3 --engine claude` (zero Apify).
+
+### 🔑 The bug that block taught us, and it is the best story in the repo
+
+harvestapi does not *fail* on the 21st run. It **succeeds**, and the dataset contains one
+item: `{"error": "Free users are limited to 20 runs..."}`. So `items` was non-empty, every
+field mapped to `None`, and the lead flowed on to be scored as a person with **"no job
+title found"** — which the scorer is designed to treat as an honest unknown.
+
+**Our billing status had been laundered into a fact about the lead.** That is the exact
+seam-versus-absence failure this whole project argues against, found inside our own
+adapter. `cost.ActorRefused` now catches a refusal-shaped result for every actor, and a
+blocked scrape routes to a human with the reason attached instead of scoring as thin.
+
+**Worth telling in the Loom.** It is the thesis of both tracks, caught red-handed in our
+own code, and fixed.
+
 ## Where this sits in the process
 
 Nebius Academy is the education arm of Nebius Group. B2C is TripleTen; **B2B is three
@@ -67,6 +105,32 @@ sources have that ours don't and turns that into recommendations.
 their actual LinkedIn profile and company, scores them on real firmographics, routes
 them, and drafts a first-touch message off inferred pain points. Built so that real
 people can be typed in and the output checked against reality.
+
+### Track A against the brief, bullet by bullet — all four covered
+
+| The brief asks for | Where it is | Note |
+|---|---|---|
+| **enriches it** (company, size, industry, role seniority) — *"real enrichment tool or mocked"* | `aeo/enrich.py`, 5 live providers | **Real, not mocked.** Serper → Apify person → Apify company, reconciled against the email domain |
+| **scores or qualifies against a fit definition you design** | `config/leads.yaml` | 6 factors + 4 disqualifier classes, versioned by `fit_hash`. Arithmetic, never a prompt |
+| **routes it** (*"MQL to nurture vs. hot lead to Sales"*) | `leads.route()` | hot (5 min) · warm (24h) · revisit_6mo · hold, **plus** disqualified / needs_review / capped |
+| **drafts a genuinely personalized first-touch message** | `leads.draft()` | Pain points inferred from the company's own words; `facts_used` declared per draft; generic drafts counted |
+| **run end-to-end on 3–5 sample leads, show the outputs** | samples + dashboard | 5 samples, and **every branch fires** |
+
+**The one honest gap, and the brief permits it:** the behavioural signals (assessment
+completed, demo booked, webinar attended) are **mocked** — they are first-party events
+from systems we have no access to, and the brief says to use realistic mock data and
+state the assumption. The firmographics underneath them are real and scraped live. That
+split is stated in `config/leads.yaml` and should be said out loud in the Loom.
+
+### Three tabs now
+
+`Track A — Inbound lead engine` · **`Track A · Logic`** · `Track C — AI visibility`
+
+The Logic tab is a **live flowchart**: nine stages down a spine with branch-offs to each
+terminal route, and **every node carries the count from the last real run**. It is a
+picture of what happened, not an illustration of the design — a branch that never fires
+reads `0`. The left edge colour-codes what *kind* of step each one is (free / paid call /
+rules / model), because keeping those kinds apart is the entire argument.
 
 ## What already exists
 
