@@ -134,20 +134,52 @@ does not get debugged into the deadline.
 
 ## What it costs to run
 
-Measured, not estimated, on 2026-08-15.
+⚠️ **These numbers were wrong until the code started reporting its own spend.** The
+first version of this table said a full Track C run cost $0.80–1.10, reconstructed from
+call counts and stored answer lengths. It **omitted the web_search tool**, which bills
+**$10 per 1,000 searches** — about **$0.80 of a single run on its own**. Search results
+are also injected into the *input*, so a one-line query reaches the model as tens of
+thousands of tokens: the half of the bill you cannot see from the answer text is the
+half that dominates it.
+
+`aeo/pricing.py` now reads `response.usage` off every call and stores it per
+observation, so this table is a query (`db.run_cost()`), not an estimate.
 
 | | |
 |---|---|
-| One Track A lead | **~$0.025** — 1 Serper query + 2 Apify calls |
-| One full Track C run (80 steps) | **~$0.80–1.10** Anthropic + ~$0.20 Apify |
+| One Track A lead | **~$0.05** — Anthropic draft, plus 1 Serper query + 2 Apify calls |
+| One full Track C run (80 steps) | **~$2.45** Anthropic (incl. ~$0.80 web search) + ~$0.65 Apify |
+| Track C, `--limit 3 --engine claude` | **~$0.35**, and zero Apify — the rehearsal setting |
 | `scripts/probe.py`, all five | under five cents |
-| The written recommendations | one Opus call, a few cents |
+| The written recommendations | ~$0.15, one Opus call |
 
-⚠️ **The scheduled workflow was daily and is now Mon/Wed/Fri.** At 80 steps with
-web-search charges, daily is roughly **$30/month on the personal Anthropic key** — the
-same key that hit its cap in July and silently cost two job assessments. Three runs a
-week still establishes a noise band, because what a baseline needs is a consistent query
-set over time rather than maximum frequency.
+### Three separate bills, and the smallest one binds
+
+**Anthropic** is metered credit — it hit zero mid-run on 15 Aug and every Claude call in
+that run returned a 400.
+
+**Apify is the FREE plan: $5/month.** This is the real constraint. Every AI Overviews
+query and every lead lookup spends it, and when it runs out both the Track C engine and
+all of Track A enrichment stop. Rehearse with `--engine claude` (no Apify) and save the
+budget for the take.
+
+**Serper** — 2,500 free credits, one per lead. Not a constraint at this volume.
+
+## ⏱️ The cron is built and deliberately switched off
+
+`.github/workflows/aeo.yml` is `workflow_dispatch` only — a "Run workflow" button.
+
+At the corrected **~$2.45/run**, a Mon/Wed/Fri schedule is **~$32/month on a personal
+key** that has already hit zero once. Paying that continuously to detect movement on a
+brand currently absent from 10 of 10 queries is buying a baseline nobody is reading yet.
+The `schedule:` block is commented, not deleted, with the arithmetic beside it — turn it
+on once the first placements land and a re-run would be expected to move.
+
+**This is a deliberate answer to the brief's bonus** (*"make the monitoring recurring"*),
+not a gap: everything that makes runs comparable over time is built and working —
+`query_set_hash` breaks the trend line when the contract changes, repeats measure the
+noise band, the trend view reads the history. Only the trigger is off, and it is one
+uncommented line. Say that out loud in the Loom; scope judgment is scored.
 
 ⚠️ **The workflow also used to `git add -f data/aeo.db`** — force-committing the
 gitignored database on a schedule. That database now has a `leads` table. CI only runs

@@ -561,11 +561,17 @@ def draft(lead: dict, enriched: dict, breakdown: list[dict], routing: dict,
         return {"error": "draft hit max_tokens and was truncated — raise "
                          "drafting.max_tokens in config/leads.yaml"}
 
+    from . import pricing
+    usage = pricing.usage_of(resp)
+
     text = next((b.text for b in resp.content if getattr(b, "type", None) == "text"), "")
     try:
-        return json.loads(text)
+        out = json.loads(text)
     except json.JSONDecodeError:
-        return {"error": "draft was not valid JSON", "raw": text[:400]}
+        return {"error": "draft was not valid JSON", "raw": text[:400],
+                "cost_usd": pricing.cost_usd(usage)}
+    out["cost_usd"] = pricing.cost_usd(usage)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -654,6 +660,7 @@ def process(lead: dict, fit: FitDefinition, budget: Budget, conn) -> dict:
     out["evidence"] = d.get("facts_used", [])
     out["pain_points"] = d.get("pain_points", [])
     out["error"] = d.get("error")
+    out["cost_usd"] = d.get("cost_usd")
     return out
 
 
@@ -730,6 +737,10 @@ def summarise(rows: list[dict]) -> dict:
         # is the only way "personalised" stays a claim you can check.
         "generic_drafts": sum(1 for r in drafted if not r.get("evidence")),
         "reconciliation": dict(recon),
+        # Measured, not estimated — see aeo/pricing.py. Anthropic only; the Serper
+        # and Apify spend for the same run is in the budget summary, which is a
+        # different provider and a different bill.
+        "cost_usd": round(sum(r.get("cost_usd") or 0 for r in rows), 4),
         # How many leads had a factor we could not measure. Surfaced because the
         # alternative is that gaps quietly become zeroes and nobody notices.
         "with_gaps": sum(1 for r in rows if r.get("gaps")),

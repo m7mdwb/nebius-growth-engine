@@ -629,8 +629,15 @@ function adhocResults(d) {
 function render(d, t) {
   $("#brand").textContent = d.brand ? "· " + d.brand : "";
   const r = d.run || {};
+  /* Cost is shown next to the run, not buried in a report. On-demand running
+     means the person pressing the button is the person paying for it. A run
+     collected before the usage instrumentation existed shows nothing rather
+     than a misleading $0.00. */
+  const c = d.cost || {};
+  const costTxt = c.calls
+    ? ` · $${c.usd.toFixed(4)} (${c.calls} calls, ${c.searches} searches)` : "";
   $("#runmeta").textContent = r.started_at
-    ? `run ${r.id} · ${r.started_at} · engines: ${r.engines || "—"}`
+    ? `run ${r.id} · ${r.started_at} · engines: ${r.engines || "—"}${costTxt}`
     : "no completed runs";
   $("#hash").textContent = r.query_set_hash ? " · contract " + r.query_set_hash : "";
 
@@ -698,6 +705,8 @@ function leadTiles(s) {
       <small>checked before scoring, and absolute</small></div>
     <div class="tile"><b>${s.needs_review}</b><span>Human review</span>
       <small>couldn't be looked up, or didn't reconcile — not the same as scoring badly</small></div>
+    <div class="tile"><b>$${(s.cost_usd || 0).toFixed(3)}</b><span>Anthropic cost</span>
+      <small>read from response.usage, not estimated — Serper and Apify bill separately</small></div>
   </div>`;
 }
 

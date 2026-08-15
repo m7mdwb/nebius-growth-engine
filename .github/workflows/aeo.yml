@@ -1,27 +1,41 @@
-name: AEO scheduled
+name: AEO run (on demand)
 
-# The "make it recurring" bonus. Measuring AI visibility once is a screenshot;
-# measuring it on a schedule against a frozen query set is a baseline, and the
-# baseline is the only thing that makes a later improvement legible.
+# The "make it recurring" bonus, built and then deliberately left switched off.
+#
+# Measuring AI visibility once is a screenshot; measuring it on a schedule against a
+# frozen query set is a baseline, and the baseline is the only thing that makes a
+# later improvement legible. Everything that makes a run *comparable* is built and
+# working — `runs.query_set_hash` fingerprints the measurement contract so a changed
+# query set breaks the trend line instead of pretending the two halves are the same
+# thing, repeats measure the noise band, and the trend view reads the history. The
+# recurrence is one uncommented line away.
+#
+# 💰 WHY IT IS OFF, and this is a scope call rather than an omission. A full run is
+# 80 steps costing **~$2.45** — and that number was wrong until the run started
+# reporting its own spend: the first estimate said $0.80–1.10 because it counted
+# tokens and forgot that the web_search tool bills $10 per 1,000 searches, which is
+# ~$0.80 of a single run on its own. At the corrected figure a Mon/Wed/Fri cron is
+# **~$32/month on a personal API key** — a key that has already hit zero once
+# mid-run. Paying that continuously to detect movement on a brand currently absent
+# from 10 of 10 queries is buying a baseline nobody is reading yet.
+#
+# Turn it on when there is something to detect: after the first placements land, when
+# a re-run would actually be expected to move. Until then this is `workflow_dispatch`
+# — a "Run workflow" button, on demand, for free.
 #
 # ⚠️ THIS RUNS TRACK C ONLY. Track A scrapes real people and must never run
 # unattended on a shared runner — see the guard before the commit step.
 
 on:
-  schedule:
-    # Mon/Wed/Fri, not daily. A full run is 80 steps with web-search tool charges,
-    # roughly $0.80-1.10 of Anthropic plus a little Apify, so daily is ~$30/month on a
-    # personal key. Three times a week still establishes a noise band — what a baseline
-    # needs is a consistent query set over time, not maximum frequency — at 40% of the
-    # cost. Raise it once there is something to detect.
-    - cron: "0 6 * * 1,3,5"
+  # schedule:
+  #   - cron: "0 6 * * 1,3,5"    # Mon/Wed/Fri 06:00 UTC — ~$32/month, see above
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: aeo-scheduled
+  group: aeo-run
   cancel-in-progress: false
 
 jobs:

@@ -11,7 +11,7 @@ import argparse
 import sys
 from typing import Callable
 
-from . import analyze, config, db
+from . import analyze, config, db, pricing
 from .engines import ENGINES
 
 Progress = Callable[[dict], None]
@@ -50,7 +50,7 @@ def collect(cfg: config.Config | None = None, *, label: str = "manual",
         )
         on_progress({"event": "run_started", "run_id": run_id, "steps": total_steps})
 
-        step = 0
+        step, spent = 0, 0.0
         for query, repeats in units:
             for engine_name in engine_names:
                 fn = ENGINES[engine_name]
@@ -81,7 +81,10 @@ def collect(cfg: config.Config | None = None, *, label: str = "manual",
                         "answer_excerpt": obs["answer_excerpt"] or obs.get("note"),
                         "error": obs["error"],
                         "serp_domains": obs.get("serp_domains") or [],
+                        "usage": result.usage,
+                        "cost_usd": pricing.cost_usd(result.usage) if result.usage else None,
                     })
+                    spent += pricing.cost_usd(result.usage) if result.usage else 0.0
                     if obs["citations"]:
                         db.record_citations(conn, run_id, [
                             {**c, "query_id": query.id, "engine": engine_name, "repeat_n": n}
@@ -110,6 +113,10 @@ def collect(cfg: config.Config | None = None, *, label: str = "manual",
                         "status": obs["status"],
                         "live": bool(result.is_live),
                         "citations": len(obs["citations"]),
+                        # Running total, so spend is legible WHILE the run happens
+                        # rather than after it. An 80-step run that dies on an
+                        # exhausted balance should say so at call one.
+                        "spent_usd": round(spent, 4),
                     })
 
         db.finish_run(conn, run_id)
@@ -135,11 +142,17 @@ def main() -> int:
             flag = "" if ev["live"] else "  [seam]"
             print(f"  [{ev['step']:>3}/{ev['steps']}] {ev['engine']:<14} "
                   f"{ev['status']:<9} {ev['citations']:>2} cites  "
-                  f"{ev['query'][:46]}{flag}", flush=True)
+                  f"${ev.get('spent_usd', 0):>6.3f}  "
+                  f"{ev['query'][:40]}{flag}", flush=True)
 
     run_id = collect(label=args.label, on_progress=echo,
                      limit=args.limit, only_engine=args.engine)
+
+    with db.session() as conn:
+        c = db.run_cost(conn, run_id)
     print(f"\ndone. run_id={run_id}")
+    print(f"cost: ${c['usd']:.4f} over {c['calls']} billed call(s) — "
+          f"{c['inp']:,} in / {c['out']:,} out tokens, {c['searches']} web search(es)")
     print("dashboard:  uvicorn web.app:app --reload   ->  http://127.0.0.1:8000")
     return 0
 

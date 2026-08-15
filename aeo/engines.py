@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from urllib.parse import urlparse
 
+from . import pricing
 from .config import Config, env
 
 
@@ -40,6 +41,9 @@ class EngineResult:
     # The organic SERP for the same query, where the surface exposes one. Only
     # AI Overviews does. Used to measure whether SEO feeds AEO — see analyze.py.
     serp: list[dict] = field(default_factory=list)
+    # Tokens and searches this call actually consumed, straight off the response.
+    # Empty for engines that aren't billed per token (Apify) and for seams.
+    usage: dict = field(default_factory=dict)
     error: str | None = None
     note: str | None = None      # why a seam is a seam, shown in the UI
 
@@ -161,6 +165,7 @@ def claude(query: str, cfg: Config) -> EngineResult:
         "claude", True, answer="\n".join(text_parts).strip(),
         citations=list(cites.values()),
         retrieved=list(retrieved.values()),
+        usage=pricing.usage_of(resp),
         # Not an error — the answer is real, just incomplete. Recorded so a run
         # full of truncations is visible instead of reading as a drop in presence.
         note="answer truncated at max_tokens" if truncated else None,

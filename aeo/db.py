@@ -52,7 +52,16 @@ CREATE TABLE IF NOT EXISTS observations (
     -- The organic SERP domains for the same query, where the surface exposes them
     -- (AI Overviews only). Kept so "does SEO feed AEO" is a query against measured
     -- data rather than an opinion. JSON list of domains.
-    serp_domains    TEXT
+    serp_domains    TEXT,
+    -- What this call actually consumed, off the response rather than estimated.
+    -- ⚠️ `web_searches` is here because it is the term an estimate always misses:
+    -- search results are injected into the INPUT, so a one-line query can reach
+    -- the model as tens of thousands of tokens, and the search line itself can
+    -- exceed the token line. See aeo/pricing.py.
+    input_tokens    INTEGER,
+    output_tokens   INTEGER,
+    web_searches    INTEGER,
+    cost_usd        REAL
 );
 
 CREATE TABLE IF NOT EXISTS citations (
@@ -196,10 +205,12 @@ def init(path: Path | None = None) -> None:
 # reading of a moment that has passed. Losing them resets the only history the tool
 # accumulates.
 _ADDED_COLUMNS = {
-    "observations": [("serp_domains", "TEXT")],
+    "observations": [("serp_domains", "TEXT"), ("input_tokens", "INTEGER"),
+                     ("output_tokens", "INTEGER"), ("web_searches", "INTEGER"),
+                     ("cost_usd", "REAL")],
     "leads": [("linkedin_url", "TEXT"), ("headcount_growth", "TEXT"),
               ("reconciliation", "TEXT"), ("unknowns", "TEXT"), ("gaps", "TEXT"),
-              ("pain_points", "TEXT"), ("trace", "TEXT")],
+              ("pain_points", "TEXT"), ("trace", "TEXT"), ("cost_usd", "REAL")],
 }
 
 
@@ -257,8 +268,9 @@ def record_observation(conn: sqlite3.Connection, run_id: int, obs: dict) -> None
     conn.execute(
         "INSERT INTO observations "
         "(run_id, query_id, query_text, intent, engine, is_live, repeat_n, status, "
-        " brand_rank, answer_chars, answer_excerpt, error, serp_domains) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " brand_rank, answer_chars, answer_excerpt, error, serp_domains, "
+        " input_tokens, output_tokens, web_searches, cost_usd) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             run_id,
             obs["query_id"],
@@ -273,8 +285,25 @@ def record_observation(conn: sqlite3.Connection, run_id: int, obs: dict) -> None
             obs.get("answer_excerpt"),
             obs.get("error"),
             _json.dumps(obs.get("serp_domains") or []),
+            (obs.get("usage") or {}).get("input_tokens"),
+            (obs.get("usage") or {}).get("output_tokens"),
+            (obs.get("usage") or {}).get("web_searches"),
+            obs.get("cost_usd"),
         ),
     )
+
+
+def run_cost(conn: sqlite3.Connection, run_id: int) -> dict:
+    """What one run cost, as a query rather than an estimate."""
+    r = conn.execute(
+        "SELECT COUNT(*) calls, COALESCE(SUM(input_tokens),0) inp, "
+        " COALESCE(SUM(output_tokens),0) out, COALESCE(SUM(web_searches),0) searches, "
+        " COALESCE(SUM(cost_usd),0) usd "
+        "FROM observations WHERE run_id = ? AND cost_usd IS NOT NULL", (run_id,)
+    ).fetchone()
+    d = dict(r)
+    d["usd"] = round(d["usd"], 4)
+    return d
 
 
 def record_citations(conn: sqlite3.Connection, run_id: int, rows: list[dict]) -> None:
@@ -384,8 +413,9 @@ def record_lead(conn: sqlite3.Connection, run_id: int, lead: dict) -> int:
         "INSERT INTO leads (run_id, email, name, company, domain, source, enriched, "
         " industry, headcount, seniority, job_function, title, score, breakdown, "
         " route, route_why, sla_minutes, disqualified, message, evidence, error, "
-        " linkedin_url, headcount_growth, reconciliation, unknowns, gaps, pain_points, trace) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " linkedin_url, headcount_growth, reconciliation, unknowns, gaps, pain_points, "
+        " trace, cost_usd) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             run_id, lead["email"], lead.get("name"), lead.get("company"),
             lead.get("domain"), lead.get("source"), int(lead.get("enriched", 0)),
@@ -400,6 +430,7 @@ def record_lead(conn: sqlite3.Connection, run_id: int, lead: dict) -> int:
             _json.dumps(lead.get("gaps") or []),
             _json.dumps(lead.get("pain_points") or []),
             _json.dumps(lead.get("trace") or []),
+            lead.get("cost_usd"),
         ),
     )
     return int(cur.lastrowid)

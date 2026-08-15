@@ -97,6 +97,7 @@ def api_report(run_id: int | None = None) -> JSONResponse:
         obs = db.observations(conn, rid)
         cits = db.citations(conn, rid)
         comps = db.competitors(conn, rid)
+        cost = db.run_cost(conn, rid)
 
     summary = analyze.summarise(obs, cits, comps)
 
@@ -139,6 +140,9 @@ def api_report(run_id: int | None = None) -> JSONResponse:
         "benchmark": bench,
         "source_gap": gap,
         "seo": seo,
+        # Measured from response.usage, not estimated. Zero for runs collected
+        # before the instrumentation existed — an honest zero, not a claim.
+        "cost": cost,
         "grid": grid,
         "queries": queries,
         "engines": engines,

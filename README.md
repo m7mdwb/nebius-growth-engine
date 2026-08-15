@@ -219,17 +219,45 @@ omitting a row.
 
 ## Costs and caps
 
+Every call's `response.usage` is stored per observation, so these are queries
+(`db.run_cost()`), not estimates — and a run prints its running total as it goes.
+
 | | |
 |---|---|
-| One lead | ~$0.025 — 1 Serper query + 2 Apify calls |
-| One full Track C run | roughly $0.60–0.90 in Claude + ~$0.20 Apify |
+| One lead | ~$0.05 — Anthropic draft, plus 1 Serper query + 2 Apify calls |
+| One full Track C run (80 steps) | ~$2.45 Anthropic (incl. ~$0.80 web search) + ~$0.65 Apify |
+| Rehearsal: `--limit 3 --engine claude` | ~$0.35, zero Apify |
 | The probe | under five cents |
+
+🔑 **The term estimates always miss is the web search tool.** It bills **$10 per 1,000
+searches** — roughly a third of a full run — and its results are injected into the
+*input*, so a one-line query reaches the model as tens of thousands of tokens. This
+table said $0.60–0.90 until the code started measuring itself; the half of the bill you
+cannot see from the answer text is the half that dominates it. That is what
+`aeo/pricing.py` exists to stop.
 
 **A retry loop against a paid actor is real money**, so caps live in `aeo/cost.py` and
 are set in `config/leads.yaml`. Three layers: a per-provider call counter, Apify's own
 server-side `max_total_charge_usd`, and a per-call timeout. Hitting a cap **raises and
 is reported** — a capped run that silently returns fewer results is indistinguishable
 from a thin day.
+
+**Three separate bills, and the smallest one binds.** Anthropic is metered credit;
+**Apify is a $5/month free plan** and is the real constraint, since it funds both the AI
+Overviews engine and all of Track A enrichment; Serper's 2,500 free credits are not a
+constraint at one query per lead.
+
+## Recurring monitoring: built, and switched off on purpose
+
+`.github/workflows/aeo.yml` runs on `workflow_dispatch` — on demand, free. The
+`schedule:` line is commented with the arithmetic beside it: at ~$2.45/run a Mon/Wed/Fri
+cron is ~$32/month, which is a lot to pay to detect movement on a brand currently absent
+from 10 of 10 queries.
+
+Everything that makes runs *comparable over time* is built and working — `query_set_hash`
+breaks the trend line rather than pretending two different query sets are the same
+measurement, repeats establish the noise band, the trend view reads the history. Only
+the trigger is off, and it is one uncommented line.
 
 ## No scraped personal data leaves the machine
 
