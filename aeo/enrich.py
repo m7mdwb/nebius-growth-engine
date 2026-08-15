@@ -174,6 +174,79 @@ def find_profile(first: str, last: str, domain: str, budget: Budget) -> dict:
 # step 2 — the person
 # ---------------------------------------------------------------------------
 
+def _skills(raw) -> list[str]:
+    """Skills arrive as dicts from one actor and bare strings from the other."""
+    out = []
+    for s in (raw or [])[:14]:
+        if isinstance(s, dict):
+            name = s.get("name") or s.get("title")
+        else:
+            name = s
+        if name:
+            out.append(str(name))
+    return out[:12]
+
+
+def _norm_harvestapi(p: dict, url: str) -> dict:
+    pos = (p.get("currentPosition") or p.get("experience") or [{}])[0] or {}
+    loc = (p.get("location") or {}).get("parsed") or {}
+    return {
+        "linkedin_url": p.get("linkedinUrl") or url,
+        "first_name": p.get("firstName"),
+        "last_name": p.get("lastName"),
+        "title": pos.get("position") or p.get("headline"),
+        "headline": p.get("headline"),
+        "company_name": pos.get("companyName"),
+        "company_linkedin": pos.get("companyLinkedinUrl"),
+        "tenure": pos.get("duration"),
+        "country": loc.get("countryCode") or (p.get("location") or {}).get("countryCode"),
+        "location": loc.get("text") or (p.get("location") or {}).get("linkedinText"),
+        "about": (p.get("about") or "")[:1200],
+        "skills": _skills(p.get("topSkills") or p.get("skills")),
+        "open_to_work": bool(p.get("openToWork")),
+    }
+
+
+def _norm_dev_fusion(p: dict, url: str) -> dict:
+    """dev_fusion's shape, measured by scripts/probe.py on 2026-08-15.
+
+    🔑 It carries a STRUCTURED `jobTitle` ("Chairman and CEO") alongside the
+    self-written `headline` ("Chairman and CEO at Microsoft"). Same rule as the
+    other actor: the structured field is the fact the seniority tier is derived
+    from, the headline is fallback and colour for the draft. It also exposes
+    `companyName` and `companyLinkedin` at the TOP level rather than inside a
+    position array — reading them from the harvestapi path returns None, which
+    would cost us the employer key and send the company step back to a search.
+    """
+    return {
+        "linkedin_url": p.get("linkedinUrl") or p.get("linkedinPublicUrl") or url,
+        "first_name": p.get("firstName"),
+        "last_name": p.get("lastName"),
+        "title": p.get("jobTitle") or p.get("headline"),
+        "headline": p.get("headline"),
+        "company_name": p.get("companyName"),
+        "company_linkedin": p.get("companyLinkedin"),
+        "tenure": p.get("currentJobDuration"),
+        "country": p.get("addressCountryOnly"),
+        "location": p.get("addressWithCountry") or p.get("jobLocation"),
+        "about": (p.get("about") or "")[:1200],
+        "skills": _skills(p.get("topSkillsByEndorsements") or p.get("skills")),
+        "open_to_work": bool(p.get("isJobSeeker")),
+    }
+
+
+# ⚠️ THE OUTPUT SHAPE DIFFERS PER ACTOR, and getting it wrong fails as silently as
+# getting the input key wrong did. dev_fusion returns none of harvestapi's
+# `currentPosition[]` fields, so the harvestapi mapper applied to a dev_fusion item
+# yields title-from-headline and a null company — a record that looks thin rather
+# than mis-parsed, and scores as an honest unknown. Normalise per actor, and record
+# WHICH actor produced the row so a shape change is traceable to a source.
+_PERSON_NORMALISERS = {
+    "dev_fusion~linkedin-profile-scraper": _norm_dev_fusion,
+    "harvestapi~linkedin-profile-scraper": _norm_harvestapi,
+}
+
+
 def scrape_person(url: str, budget: Budget) -> dict:
     """Normalise a person record. Returns {} when nothing came back.
 
@@ -181,7 +254,7 @@ def scrape_person(url: str, budget: Budget) -> dict:
     to the next; if EVERY actor refuses, `ActorRefused` propagates — because at that
     point the honest report is "we were blocked", not "this person has no profile".
     """
-    items, refusals = [], []
+    items, refusals, used = [], [], None
     for actor, key in PERSON_ACTORS:
         try:
             items = apify_call(actor, {key: [url]}, budget, what=f"person: {url[-34:]}")
@@ -192,6 +265,7 @@ def scrape_person(url: str, budget: Budget) -> dict:
             refusals.append(f"{actor.split('~')[0]}: {type(exc).__name__}: {str(exc)[:90]}")
             continue
         if items:
+            used = actor
             break
 
     if not items:
@@ -199,29 +273,10 @@ def scrape_person(url: str, budget: Budget) -> dict:
             raise ActorRefused(" | ".join(refusals))
         return {}
 
-    p = items[0]
-    pos = (p.get("currentPosition") or p.get("experience") or [{}])[0] or {}
-    loc = (p.get("location") or {}).get("parsed") or {}
-
-    return {
-        "linkedin_url": p.get("linkedinUrl") or url,
-        "first_name": p.get("firstName"),
-        "last_name": p.get("lastName"),
-        # ⚠️ `headline` is self-written marketing ("Helping teams unlock AI!") and is a
-        # bad input to a title-based seniority rule. The structured position is the
-        # fact; the headline is the fallback and the colour for the draft.
-        "title": pos.get("position") or p.get("headline"),
-        "headline": p.get("headline"),
-        "company_name": pos.get("companyName"),
-        "company_linkedin": pos.get("companyLinkedinUrl"),
-        "tenure": pos.get("duration"),
-        "country": loc.get("countryCode") or (p.get("location") or {}).get("countryCode"),
-        "location": loc.get("text") or (p.get("location") or {}).get("linkedinText"),
-        "about": (p.get("about") or "")[:1200],
-        "skills": [s.get("name") for s in (p.get("topSkills") or p.get("skills") or [])
-                   if isinstance(s, dict) and s.get("name")][:12],
-        "open_to_work": bool(p.get("openToWork")),
-    }
+    norm = _PERSON_NORMALISERS.get(used, _norm_harvestapi)
+    rec = norm(items[0], url)
+    rec["source_actor"] = (used or "").split("~")[0] or None
+    return rec
 
 
 # ---------------------------------------------------------------------------
