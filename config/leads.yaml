@@ -364,8 +364,10 @@ drafting:
 # verify the scraped record against reality in ten seconds, which is what makes a
 # demo of live enrichment worth watching rather than taking on trust.
 samples:
-  # Large enterprise, exec, and behaviour that earns the fast lane. The only one of
-  # the five that can route hot, because it is the only one with real intent.
+  # Large enterprise, exec, and behaviour that earns the fast lane. One of TWO that
+  # route hot — Hanno Renner is the other, on a completed assessment plus two pricing
+  # visits. (This comment used to claim it was the only one, which was simply false:
+  # both clear 70 points and 25 intent.)
   - email: satya.nadella@microsoft.com
     first_name: Satya
     last_name: Nadella
