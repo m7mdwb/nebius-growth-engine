@@ -1,214 +1,216 @@
-# Loom — the spoken script
+# Loom — what to say
 
-Read it the way you'd talk. `[brackets]` are stage directions, everything else is out
-loud.
+`[brackets]` are what you do. Everything else you say.
 
-**Timing, measured not guessed: ~1,130 spoken words.** At a normal demo pace (165 wpm)
-that is 6:50 plus the two silences — **7:45 total, inside the 8-minute ceiling.** At a
-slow, careful pace it runs to 8:40, which is over.
+Read it out loud once before recording. If a line feels awkward in your mouth, change it
+— it should sound like you, not like you're hitting marks.
 
-So: **speak at pace, and if you feel slow, drop the three *italic* paragraphs.** They
-are the nice-to-haves and they buy back about a minute between them. The rest is load
-bearing.
+**1,208 spoken words — counted, not estimated.** That's **8:10** at a normal demo pace,
+or 9:00 if you speak slowly. The brief's ceiling is 8 minutes, so speak at pace.
 
-Reasoning behind each beat is in `loom_shotlist.md`.
+If you want headroom, these four lines are the ones to drop. They're worth about 50
+seconds between them and nothing depends on them:
 
----
+- "Blue is rules, purple is the model…" — the screen already shows it
+- "And the model declares which facts it used…"
+- "The model writes these, then a plain lookup checks…"
+- The whole scheduled-version paragraph near the end
 
-## 0:00 — Open
-
-*[App open on **Inbound leads**. Don't touch anything.]*
-
-Hi, I'm Mohamed. Before I show you anything, let me answer the question you're going to
-ask me anyway.
-
-The brief said pick one track. I built two. They're the same engine pointed at two
-problems: one config file holds the contract, rules make every decision, the model only
-does the two things rules genuinely can't, and anything we didn't measure gets declared
-rather than quietly scored zero.
-
-Track A, the inbound lead engine, is my submission. Track C is the second half, because
-it's the same argument against a harder problem — one where the answer comes back zero.
-
-Three things I deliberately didn't build: per-market query sets, live keys for ChatGPT
-and Perplexity, and CRM write-back.
+Everything else earns its place. The Apify story is the longest single block and it is
+the one to protect.
 
 ---
 
-## 0:40 — Lead logic
+## Open
+
+*[On **Inbound leads**. Don't touch anything.]*
+
+Hi, I'm Mohamed. Before I show you anything, let me get the awkward question out of the
+way.
+
+The brief said pick one track. I did two. So, why.
+
+They're the same thing pointed at two problems. One config file holds the rules, the
+rules make every decision, and the model only does the couple of things rules genuinely
+can't. And anywhere we didn't measure something, it says so instead of putting a zero
+there and hoping nobody asks.
+
+The lead engine is what I'm submitting. The second one is the same argument against a
+harder problem, where the answer comes back zero.
+
+Things I decided not to build: per-market queries, live keys for ChatGPT and Perplexity,
+and writing back into a CRM.
+
+---
+
+## Lead logic
 
 *[Click **Lead logic**.]*
 
 How it decides, then I'll run it.
 
-Nine stages, and every node carries the count from the last real run — a picture of what
-happened, not a diagram of what I intended. If a branch never fired it reads zero.
+One lead, top to bottom. And the number on each step is how many of my five leads got
+that far.
 
-The colour on the left edge is what *kind* of step it is. The fallible ones — search,
-scraping, the model — are fenced off from the ones that decide, which are all rules.
+Five come in. One drops out straight away because it's a Gmail address, and there's no
+company behind a Gmail address, so I don't spend money finding that out. Four go to the
+paid lookups. One of those doesn't reconcile, so it goes to a human instead of a score.
+Three make it through. You can add the branches up. That's the last real run, not a
+drawing of how I'd like it to work.
 
-Here's the story I'd most want you to hear.
+Blue is rules, purple is the model, and everything that can go wrong on me sits up here,
+before anything gets decided.
 
-Apify's scraper hit its free-plan cap halfway through this project. It didn't error. It
-*succeeded* — and returned a dataset containing one item, which was an error message.
-Every field mapped to null, so the lead scored as a person with "no job title found",
-which my scorer treats as an honest unknown.
+Now this is the bit I want to tell you about.
 
-My billing status had been laundered into a fact about a human being.
+Halfway through building this, my Apify account hit its free limit. And the scraper
+didn't fail. That's the problem. It came back successful, and the data it handed me was
+one row, and that row was the error message.
 
-That's exactly what this submission argues against, and I found it in my own code. A
-refused scrape now goes to a person with the reason attached.
+So my code read it, found no name and no job title, and carried on. And my scorer is
+deliberately generous about missing data. If we don't know someone's job title, it
+doesn't punish them for it, it just writes down that we don't know.
 
-*[Scroll to the tables.]*
+So that lead came out looking like a normal person we happened not to learn much about.
+It got scored. It got routed. And the real reason was that I'd run out of credit.
 
-*And every weight sits underneath, read live from the config file — so the explanation
-can't drift from the rules it's explaining.*
+My billing problem turned into a fact about someone's career. That's the exact thing
+this project argues against, so finding it in my own code was not a good morning. It's
+fixed now. If a scraper refuses us, the lead goes to a person with the reason attached.
 
 ---
 
-## 1:50 — Inbound leads
+## Inbound leads
 
 *[Click **Inbound leads**.]*
 
-Five leads, four routes. Score out of 198 — 105 firmographic, 93 behavioural, and the
-gates are separate, so a perfect company with no buying signal still can't reach sales.
+Five leads, four different outcomes.
+
+Score's out of 198. Roughly a hundred of that is the company, the rest is what they
+actually did, and those are separate gates. A perfect company that's never done anything
+still can't reach sales.
 
 *[Expand Satya Nadella.]*
 
-Every point names where it came from. And revenue, valuation and funding are *not*
-scored as zero — they aren't obtainable for private companies, and a model asked for
-them invents a fluent, specific, unfalsifiable number. So they're recorded as unknowns.
+Every point tells you where it came from. And these three, revenue, valuation, funding,
+are marked as not scored rather than scored zero. You can't get those for a private
+company, and if you ask a model it'll hand you a very confident number it invented.
 
-*[Point at the green chips.]*
+*[Point at the green chips.]* And the model declares which facts it used. A draft citing
+nothing is a mail merge with a name in it.
 
-The model declares which facts it leaned on. A draft citing nothing is a mail-merge in
-costume, and the dashboard counts those.
-
-### The live lookup
+### Live
 
 *[Type: Judith · Wiese · judith.wiese@siemens.com. Tick assessment + pricing. Click.]*
 
-Let me put a real person through it. That's a work email built from the company's
-pattern — the pipeline only uses the domain, because the domain is the one fact no
-search engine proposed to us.
+Let me put someone real through it. That's a work email built from the company's usual
+pattern, and the pipeline only uses the domain, because the domain is the one thing here
+no search engine suggested to me.
 
-*[STOP TALKING. ~20 seconds. Then read the rail.]*
+*[SAY NOTHING. ~20 seconds. Then read the steps off the screen.]*
 
-That's the enrichment trace being written as it happens. And reconciliation checks two
-things: the company website matches the email domain, and the profile name matches the
-mailbox.
+That's the actual trace, written as it happens.
 
-That second check is there because the top hit for a name at a company of nearly three
-hundred thousand people is very often a different employee. And that record doesn't
-score badly — it scores *well*, because every field looks complete.
+And it reconciles on two things. The company's website has to match the email domain,
+and the name on the profile has to match the mailbox.
 
-Chief People Officer at Siemens, 278,000 staff, 122 points, hot. Untick those two
-behaviour boxes and she scores 82 and routes warm. A big company with the right title
-isn't a buying signal.
+That second one's there because if you search a name at a company with three hundred
+thousand employees, quite often you find a different employee. And a record like that
+doesn't score badly. It scores well, because every field is filled in.
+
+Chief People Officer at Siemens, 278,000 people, 122 points, hot. Untick those two
+behaviour boxes and she drops to 82 and goes to the warm queue. Big company, right
+title, no signal, that's not a hot lead.
 
 ---
 
-## 3:40 — AEO logic
+## AEO logic
 
 *[Click **AEO logic**.]*
 
-Second half — how we show up inside AI assistants.
+Second half. Whether we show up when someone asks an AI assistant.
 
-Two hatched paths here, and they are not the same claim. Forty readings were never
-collected: no keys for ChatGPT and Perplexity, so those are declared seams. Twenty were
-asked for and came back empty, because my Anthropic credit ran out mid-run.
+These two striped paths are what I care about, and they're not the same thing.
 
-Both store as unmeasured, both are excluded from every rate. But a run where the second
-number climbs is a broken instrument, and one where only the first is high is just a
-narrower one. Folding either into "absent" would report my own missing credentials as
-evidence about the market.
+Forty of these we never asked. No key for ChatGPT or Perplexity, so I don't have an
+answer and I say so. Twenty we did ask, and nothing came back, because my Anthropic
+credit ran out mid-run.
 
-*That twenty used to read zero, incidentally. The fix only applied going forward and
-never migrated the stored rows, so this tab claimed a clean run while twenty dead calls
-sat in the absent column. I found it — and the correction is a committed script, not a
-quiet database update.*
+Both get filed as not measured, both stay out of the percentages. But if that second
+number starts climbing, my tool is broken. If only the first is high, it's just narrower
+than I'd like. And letting either show up as "we're not there" would be me reporting my
+own missing API key as a fact about the market.
 
 ---
 
-## 4:40 — AI visibility
+## AI visibility
 
 *[Click **AI visibility**.]*
 
-One number, and it comes apart. It reads one of ninety, not one of a hundred — answer
-rank is excluded, because nothing named us, so there's no position to hold. Those ten
-points are held out of the denominator rather than counted as failure.
+One number, and you can take it apart.
 
-*[Benchmark.]*
+It says one out of ninety, not out of a hundred. One of the four things I score is where
+we rank among the brands named, and nothing named us at all, so there's no position to
+hold. Rather than score that zero, I take the points out of the total and say why.
 
-Zero of ten. A count, never a percentage — a percentage hides its denominator, and
-that's where these dashboards lie.
+*[Benchmark.]* Zero out of ten. A count, not a percentage. Thirty percent looks identical
+whether it's three out of ten, or three out of ten with four you never checked.
 
-*[Source gap.]*
+*[Source gap.]* This is the part I'd act on. Knowing we lose ten questions isn't useful.
+Knowing the answers beating us lean on forty-three blog roundups, three analyst pieces
+and two competitors' own sites tells you exactly where to go.
 
-This is the part I'd act on. Knowing we lose ten queries isn't useful. Knowing the
-answers beating us lean on forty-three editorial roundups, three analyst pieces and two
-competitor blogs — that names where to go and get placed.
+*[Recommendations.]* The model writes these, then a plain lookup checks every source it
+names against what we actually collected.
 
-*[SEO panel.]* Thirty of the thirty-four cited domains were also ranking organically for
-the same query, so for us, ranking still buys citations.
+*[Click "See what winning looks like →".]* Same screen, seeded data. One of ninety
+becomes fifty-five out of a hundred. And it tells you it's seeded, because that flag
+lives in the database row, not in a caption I could forget to write.
 
-*[Recommendations.]* The model writes these, and a lookup — not a second model call —
-checks every source it cited against what this run actually collected.
+*[Click back. Type a question in the ad-hoc box, click Ask.]* And I can ask one live.
 
-*[Click "See what winning looks like →".]*
+*[SAY NOTHING. ~30 seconds.]*
 
-Same board, seeded data. One of ninety becomes fifty-five of a hundred — and the banner
-says it's seeded, because that flag lives in the database row, not a caption.
-
-*[Click back. Scroll to the ad-hoc box, type a buyer question, click Ask.]*
-
-And I can ask one live.
-
-*[STOP TALKING. ~30 seconds.]*
-
-Real engines, right now. The two without keys say "never called" rather than quietly
-reporting nothing. And this one isn't saved — the ten queries are a fixed contract, and
-letting a one-off write into those tables would corrupt every comparison to date.
+Real engines, just now. The two without keys say "never called" rather than going quiet.
+And this one isn't saved, because those ten questions are fixed, and letting a one-off
+write into the same table would ruin every comparison I have.
 
 ---
 
-## 6:20 — Cost, tooling, close
+## Close
 
-Cost is measured, not estimated — read off the usage on every call. Six cents a lead,
-about three dollars ten a full collection.
+Cost is measured, not guessed. Six cents a lead, about three dollars a full run.
 
-One judgement call worth naming: everything scraped here goes through Apify because I
-already had an account and could be live the same afternoon. It's a marketplace of
-third-party scrapers, not a data vendor — two actors doing the same job returned
-completely different response shapes. In production I'd buy the data, not the scraper:
-Cognism for European firmographics under GDPR. And for AI visibility I'd probably just
-buy Otterly at twenty-nine a month. What's worth keeping from this build is the source
-gap and the recommendation layer — the part none of them do.
+One thing on tooling. The scraping goes through Apify because I already had an account
+and could be running the same afternoon. It's a marketplace of other people's scrapers,
+not a data provider, and two of them doing the same job handed back completely different
+shapes of data. In production I'd buy the data, not the scraper. And for the visibility
+side I'd probably just pay for Otterly at thirty a month. What's worth keeping from mine
+is the source gap and the recommendations, because none of them do that.
 
-The recurring monitoring is built and deliberately off. Forty dollars a month to detect
-movement on a brand absent from all ten queries. Everything that makes runs comparable
-is built — only the trigger is off, and it's one uncommented line.
+The scheduled version is built and switched off on purpose. Forty dollars a month to
+watch a number that's currently zero. One line to turn on when there's something to
+watch.
 
-First thing I'd add next is per-market query sets. AI answers are locale-sensitive, and
-Europe is the expansion this role exists to serve.
+If I kept going, first thing I'd add is per-market queries. AI answers change by
+country, and Europe is the bit this role is actually about.
 
 Thanks for watching.
 
 ---
 
-## Notes to yourself
+## Reminders
 
-- The two silences are deliberate. Don't fill them — the stage rails are more
-  persuasive than narration over them.
-- Don't say "as you can see". Don't read the screen aloud.
-- Don't apologise for the zero, the seams, or the mocked behaviour signals.
-- If they ask how long it took, give the real number.
+- Two silences are on purpose. Let them run.
+- Don't read the screen aloud, and don't say "as you can see".
+- Don't apologise for the zero or the missing keys. Say why once, move on.
+- If they ask how long it took, tell them the truth.
 
 ## Before you record
 
-- Server up **without** `--reload` — a file save mid-run kills a collection.
+- Server running **without** `--reload`. Saving a file mid-run kills a collection.
 - Run picker on **run 3 · measured**.
-- Clean five in the table — lookups append now, so rehearsals pile up.
-  `python -m aeo.leads` resets it.
+- Five leads in the table. Lookups add to it now, so rehearsals stack up —
+  `python -m aeo.leads` gives you a clean five.
 - Rehearse the exact lookup you'll do on camera.
 - Close the Apify and Claude billing tabs.
