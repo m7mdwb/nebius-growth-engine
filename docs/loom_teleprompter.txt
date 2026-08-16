@@ -87,12 +87,20 @@ Plain dashes, paste straight into the prompter. CAPS = hit it harder.
 [CLICK AEO LOGIC]
 
 - Second half. Whether we show up when someone asks an AI assistant.
-- These two striped paths are what I care about, and they are NOT the same thing.
-- Forty of these we never asked. No key for ChatGPT or Perplexity, so I don't have an answer, and I say so.
-- Twenty we DID ask, and nothing came back. My Anthropic credit ran out mid-run.
+
+[POINT AT THE TWO STRIPED ROWS UNDER STEP 2 - ChatGPT and Perplexity, 20 each]
+
+- These two. Twenty readings each, forty altogether. We never asked them.
+- No key for ChatGPT or Perplexity. So I don't have an answer, and the tool says that, instead of guessing.
+
+[SCROLL DOWN TO STEP 4 - the striped DEAD AIR row, 20]
+
+- Now this one. Also twenty. Completely different thing.
+- Here we DID ask, and nothing came back. My Anthropic credit ran out mid-run.
 - Both get filed as not measured. Both stay out of the percentages.
-- But if that second number starts climbing, my tool is broken.
-- If only the first one is high, it's just narrower than I'd like.
+- But they mean opposite things.
+- If THIS number starts climbing, my tool is broken.
+- If only the top one is high, the tool is fine, it's just narrower than I'd like.
 - And letting either of them show up as "we're not there" would be me reporting my own missing API key as a fact about the market.
 
 
