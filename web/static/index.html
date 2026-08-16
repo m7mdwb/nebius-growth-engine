@@ -1282,10 +1282,17 @@ function flowChart(d) {
   const total     = L.length;
   const personal  = n(l => l.route === "disqualified" && !l.linkedin_url && !l.headcount);
   const disqOther = (routes.disqualified || 0) - personal;
-  const recon     = k => n(l => (l.reconciliation || {}).verdict === k);
-  const mismatch  = recon("mismatch") + recon("thin");
+  const toHuman   = routes.needs_review || 0;
   const scored    = n(l => l.score != null);
   const drafted   = n(l => l.message);
+
+  /* EVERY stage carries the number that REACHED it, so the spine reads as a funnel
+     rather than a diagram with counts sprinkled on the nodes that happened to have
+     one handy. Blanks on six of nine stages read as missing data; they were actually
+     "no count was interesting here", which is a distinction only the author can see. */
+  const afterDomain = total - personal;              // personal mailboxes leave at 2
+  const afterRecon  = afterDomain - toHuman;         // unreconciled leave at 5
+  const afterDisq   = afterRecon - Math.max(disqOther, 0);
 
   /* kind drives the left accent + legend: what KIND of step is this?
      The whole argument of Track A is that these are different kinds of thing
@@ -1311,9 +1318,10 @@ function flowChart(d) {
 
   return `<section>
     <h2>How a lead becomes a decision</h2>
-    <p class="sub">The live pipeline, with the counts from the last run on every node —
-      not an illustration of it. If a branch never fires it reads <b>0</b> here, so the
-      diagram cannot quietly drift away from the code it describes.
+    <p class="sub"><b>The number on each stage is how many leads reached it</b>, and the
+      number on each branch is how many left there — so the spine reads top to bottom as
+      a funnel of the last real run, not as an illustration. If a branch never fires it
+      reads <b>0</b>, which is a measurement rather than a blank.
       <b>Read the left edge:</b> the colour is what <i>kind</i> of step it is, and the
       whole design is about keeping those kinds apart — the fallible steps
       (search, scrape, model) are fenced off from the deciding steps (rules).</p>
@@ -1330,28 +1338,29 @@ function flowChart(d) {
       ${stage(1, "free", "Inbound lead", "Name, surname, work email. Behaviour (assessment, demo, webinar) rides along as first-party signals.", total,
         "The email <b>domain</b> is the only fact here that no search engine proposed to us. Everything downstream is checked against it.")}
 
-      ${stage(2, "free", "Domain heuristics", "Free-mail detection, before a single credit is spent.", null,
+      ${stage(2, "free", "Domain heuristics", "Free-mail detection, before a single credit is spent.", total,
         "A personal mailbox has no company behind it, so the paid lookups are <b>skipped, not spent proving it</b>.")}
       ${exit("Disqualified — personal mailbox", personal, "0 paid calls made", "dq")}
 
-      ${stage(3, "paid", "Serper → LinkedIn profile", '<code>site:linkedin.com/in "Name" "Company"</code> — the hop between a name and a URL.', null,
+      ${stage(3, "paid", "Serper → LinkedIn profile", '<code>site:linkedin.com/in "Name" "Company"</code> — the hop between a name and a URL.', afterDomain,
         "~$0.001. ⚠️ This only ever <b>proposes</b>: the top hit for a common name is a different real person often enough to matter.")}
 
-      ${stage(4, "paid", "Apify — person, then company", "Structured current position and employer; then employeeCount, industry, HQ, description.", null,
+      ${stage(4, "paid", "Apify — person, then company", "Structured current position and employer; then employeeCount, industry, HQ, description.", afterDomain,
         "~$0.02 for both. The person record hands us the employer's own LinkedIn URL, which is a better company key than anything we could guess.")}
 
-      ${stage(5, "rules", "Reconcile against the email domain", "Does the scraped company's own website match the domain the lead typed?", null,
+      ${stage(5, "rules", "Reconcile against the email domain", "Does the scraped company's own website match the domain the lead typed?", afterDomain,
         "🔑 <b>The step that makes everything after it trustworthy.</b> An unreconciled record is not a blank — it is a stranger's career attached to a real name, and it would score <i>well</i>, not badly, because every field looks complete.")}
-      ${exit("Human review — mismatch or nothing found", mismatch, "never reaches the scorer", "rev")}
+      ${exit("Human review — mismatch, or nothing found to reconcile against", toHuman,
+        "never reaches the scorer", "rev")}
 
-      ${stage(6, "rules", "Disqualifiers", "Blocked roles, excluded industries, headcount floor. Absolute, and checked before scoring.", null,
+      ${stage(6, "rules", "Disqualifiers", "Blocked roles, excluded industries, headcount floor. Absolute, and checked before scoring.", afterRecon,
         "A strong firmographic profile must never outvote a hard exclusion — letting it is the commonest way one of these quietly poisons a pipeline.")}
       ${exit("Disqualified — rule hit", Math.max(disqOther, 0), "not a low score; not a lead", "dq")}
 
       ${stage(7, "rules", "Score — arithmetic, not a prompt", "Headcount · headcount growth · seniority · function · industry · intent. Every point shows its source.", scored,
         "Ask a model to score a lead out of 100 and you get a confident number it cannot reproduce twice and no salesperson can argue with. Unmeasurable factors go to <b>gaps</b> — never scored as zero.")}
 
-      ${stage(8, "rules", "Route — two gates, not one", "Fit says <i>worth talking to</i>. Intent says <i>now</i>. Both, or it isn't now.", null,
+      ${stage(8, "rules", "Route — two gates, not one", "Fit says <i>worth talking to</i>. Intent says <i>now</i>. Both, or it isn't now.", afterDisq,
         "⚠️ Routing on the total alone once sent a webinar no-show to sales on a 5-minute SLA, earned purely on headcount and job title.")}
       <div class="froutes">
         ${exit("Hot · 5 min", routes.hot || 0, "fit ≥ 70 AND intent ≥ 25", "hot")}
@@ -1530,7 +1539,7 @@ function flowChartC(d) {
 
       ${stage(8, "model", "Recommendations — the one thing rules cannot do",
         "3–5 concrete moves, written from the benchmark, the source gap and the overlap figure.",
-        null,
+        "on demand",
         "The <b>only</b> model call in the analysis path, and it never sees the raw answers — it is handed the evidence tables above and nothing else. A model given raw answers returns five bullets that would be identical for any company in any category; a model given a table it cannot argue with has to name specific domains. Generated on demand from the Track C tab: one Opus call, about $0.15.")}
     </div>
 
