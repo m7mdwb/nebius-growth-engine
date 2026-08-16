@@ -1,0 +1,157 @@
+GROWTH ENGINE - LOOM CUES - TARGET 6:30
+Plain dashes, paste straight into the prompter. CAPS = hit it harder.
+
+
+=== 0:00  OPEN  (30s) ===
+[ON INBOUND LEADS. DON'T CLICK ANYTHING]
+
+- Hi, I'm Mohamed. Let me get the awkward question out of the way first.
+- The brief said pick one track. I did two.
+- They're the same engine pointed at two problems.
+- One config file holds the rules. The rules make every decision.
+- The model only does the couple of things rules genuinely can't.
+- And anywhere we didn't measure something, it SAYS so. Never a zero.
+- The lead engine is what I'm submitting.
+- The second one is the same argument against a harder problem, where the answer comes back zero.
+- Things I decided not to build: per-market queries. Live keys for ChatGPT and Perplexity. Writing back into a CRM.
+
+
+=== 0:30  THE TABLE  (40s) ===
+
+- Five leads, four different outcomes.
+- Score is out of 198. Roughly a hundred of that is the company, the rest is what they actually did.
+- Those are SEPARATE gates.
+- A perfect company that's never done anything still can't reach sales.
+
+[EXPAND SATYA NADELLA]
+
+- Every point tells you where it came from.
+- And these three - revenue, valuation, funding - are marked NOT SCORED. Not scored zero.
+- You can't get those for a private company. Ask a model, it hands you a confident number it invented.
+- These green chips are the facts the model actually used to write the message.
+- A draft that cites nothing is a mail merge with a name in it.
+
+
+=== 1:10  START THE LOOKUP, THEN KEEP TALKING  (80s) ===
+[TYPE: Judith / Wiese / judith.wiese@siemens.com]
+[TICK: assessment + pricing]
+[CLICK - THEN DON'T STOP TALKING]
+
+- Let me put someone real through it.
+- That's a work email built from the company's usual pattern.
+- The pipeline only uses the domain, because the domain is the one thing here no search engine suggested to me.
+
+[WHILE IT RUNS, TELL THIS]
+
+- So. Halfway through building this, my Apify account hit its free limit.
+- And the scraper didn't fail. That's the problem.
+- It came back successful. And the data it handed me was one row. And that row was the error message.
+- My code read it, found no name and no job title, and carried on.
+- And my scorer is deliberately generous about missing data.
+- If we don't know someone's job title, it doesn't punish them for it. It just writes down that we don't know.
+- So that lead came out looking like a normal person we happened not to learn much about.
+- It got scored. It got routed.
+- And the real reason was that I'd run out of credit.
+- My billing problem turned into a fact about someone's career.
+- That's the exact thing this project argues against. So finding it in my own code was not a good morning.
+- It's fixed. If a scraper refuses us now, the lead goes to a person with the reason attached.
+
+
+=== 2:30  READ THE RESULT  (40s) ===
+
+- And there it is. That's the trace, written as it happened.
+- It reconciles on TWO things.
+- The company's website has to match the email domain. AND the name on the profile has to match the mailbox.
+- That second one's there because if you search a name at a company with three hundred thousand employees, quite often you find a different employee.
+- And a record like that doesn't score badly. It scores WELL. Because every field is filled in.
+- Chief People Officer at Siemens. 278,000 people. 122 points. Hot.
+- If I untick those two behaviour boxes she drops to 82 and goes to the warm queue.
+- Big company, right title, no signal. That's not a hot lead.
+
+
+=== 3:10  LEAD LOGIC  (40s) ===
+[CLICK LEAD LOGIC]
+
+- This is the same thing as a pipeline.
+- The number on each step is how many of my five leads got that far.
+- Five come in. One drops out straight away because it's a Gmail address.
+- There's no company behind a Gmail address, so I don't spend money finding that out.
+- Four go to the paid lookups. One doesn't reconcile, so it goes to a human instead of a score.
+- Three make it through.
+- You can add the branches up. That's the last real run, not a drawing of how I'd like it to work.
+- Blue is rules. Purple is the model.
+- And everything that can go wrong on me sits up here, before anything gets decided.
+
+
+=== 3:50  AEO LOGIC  (50s) ===
+[CLICK AEO LOGIC]
+
+- Second half. Whether we show up when someone asks an AI assistant.
+- These two striped paths are what I care about, and they are NOT the same thing.
+- Forty of these we never asked. No key for ChatGPT or Perplexity, so I don't have an answer, and I say so.
+- Twenty we DID ask, and nothing came back. My Anthropic credit ran out mid-run.
+- Both get filed as not measured. Both stay out of the percentages.
+- But if that second number starts climbing, my tool is broken.
+- If only the first one is high, it's just narrower than I'd like.
+- And letting either of them show up as "we're not there" would be me reporting my own missing API key as a fact about the market.
+
+
+=== 4:40  AI VISIBILITY  (90s) ===
+[CLICK AI VISIBILITY]
+
+- One number, and you can take it apart.
+- It says one out of NINETY. Not out of a hundred.
+- One of the four things I score is where we rank among the brands named. Nothing named us at all, so there's no position to hold.
+- Rather than score that zero, I take the points out of the total and say why.
+
+[SCROLL TO BENCHMARK]
+
+- Zero out of ten. A count. Not a percentage.
+- Thirty percent looks identical whether it's three out of ten, or three out of ten with four you never checked.
+
+[SCROLL TO SOURCE GAP]
+
+- This is the part I'd actually act on.
+- Knowing we lose ten questions isn't useful.
+- Knowing the answers beating us lean on forty-three blog roundups, three analyst pieces and two competitors' own sites - that tells you exactly where to go.
+
+[SCROLL TO RECOMMENDATIONS]
+
+- The model writes these. Then a plain lookup checks every source it names against what we actually collected.
+
+[CLICK "SEE WHAT WINNING LOOKS LIKE"]
+
+- Same screen, seeded data. One of ninety becomes fifty-five out of a hundred.
+- And it tells you it's seeded, because that flag lives in the database row. Not in a caption I could forget to write.
+
+[CLICK BACK]
+
+
+=== 6:00  CLOSE  (30s) ===
+
+- Cost is measured, not guessed. Six cents a lead, about three dollars a full run.
+- One thing on tooling. The scraping goes through Apify because I already had an account and could be running the same afternoon.
+- It's a marketplace of other people's scrapers. Not a data provider.
+- Two of them doing the same job handed back completely different shapes of data.
+- In production I'd buy the data, not the scraper. Cognism for European contacts, because GDPR is a real problem there.
+- And for the visibility side I'd probably just pay for Otterly, about thirty dollars a month.
+- What's worth keeping from mine is the source gap and the recommendations. None of those tools do that.
+- The scheduled version is built and switched off on purpose. Forty dollars a month to watch a number that's currently zero.
+- One line to turn on when there's something to watch.
+- If I kept going, first thing I'd add is per-market queries. AI answers change by country, and Europe is the bit this role is actually about.
+- Thanks for watching.
+
+
+=== IF YOU'RE RUNNING LONG, CUT IN THIS ORDER ===
+
+- The Cognism and Otterly detail. Just say "I'd buy the data, not the scraper."
+- The whole LEAD LOGIC section. 40 seconds, nice to have, not essential.
+- The "see what winning looks like" click.
+
+
+=== REMINDERS ===
+
+- Do NOT wait in silence for the lookup. That's what the Apify story is for.
+- Don't read the screen out loud.
+- Don't apologise for the zero or the missing keys. Say why once, move on.
+- If they ask how long it took, tell them the truth.
