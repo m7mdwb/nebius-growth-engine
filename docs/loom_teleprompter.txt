@@ -93,22 +93,23 @@ Plain dashes, paste straight into the prompter. CAPS = hit it harder.
 - These two. Twenty readings each, forty altogether. We never asked them.
 - No key for ChatGPT or Perplexity. So I don't have an answer, and the tool says that, instead of guessing.
 
-[SCROLL DOWN TO STEP 4 - the striped DEAD AIR row, 20]
+[SCROLL DOWN TO STEP 4 - the striped DEAD AIR row, 2]
 
-- Now this one. Also twenty. Completely different thing.
-- Here we DID ask, and nothing came back. My Anthropic credit ran out mid-run.
+- Now this one. Two. Completely different thing.
+- Here we DID ask, and nothing came back. Two answers came back empty.
 - Both get filed as not measured. Both stay out of the percentages.
 - But they mean opposite things.
-- If THIS number starts climbing, my tool is broken.
-- If only the top one is high, the tool is fine, it's just narrower than I'd like.
+- Forty is the shape of my setup. Two is the health of the instrument.
+- If THAT number starts climbing, my tool is broken. At two, it's fine.
 - And letting either of them show up as "we're not there" would be me reporting my own missing API key as a fact about the market.
+- An earlier run had twenty in that column, when my Anthropic credit ran out mid-collection. The tool caught it rather than filing twenty made-up absences.
 
 
 === 4:40  AI VISIBILITY  (90s) ===
 [CLICK AI VISIBILITY]
 
 - One number, and you can take it apart.
-- It says one out of NINETY. Not out of a hundred.
+- It says zero out of NINETY. Not out of a hundred.
 - One of the four things I score is where we rank among the brands named. Nothing named us at all, so there's no position to hold.
 - Rather than score that zero, I take the points out of the total and say why.
 
@@ -121,7 +122,7 @@ Plain dashes, paste straight into the prompter. CAPS = hit it harder.
 
 - This is the part I'd actually act on.
 - Knowing we lose ten questions isn't useful.
-- Knowing the answers beating us lean on forty-three blog roundups, three analyst pieces and two competitors' own sites - that tells you exactly where to go.
+- Knowing the answers beating us lean on a hundred and two blog roundups and listicles, four analyst pieces, and two competitors' own sites - that tells you exactly where to go.
 
 [SCROLL TO RECOMMENDATIONS]
 
@@ -129,7 +130,7 @@ Plain dashes, paste straight into the prompter. CAPS = hit it harder.
 
 [CLICK "SEE WHAT WINNING LOOKS LIKE"]
 
-- Same screen, seeded data. One of ninety becomes fifty-five out of a hundred.
+- Same screen, seeded data. Zero of ninety becomes fifty-five out of a hundred.
 - And it tells you it's seeded, because that flag lives in the database row. Not in a caption I could forget to write.
 
 [CLICK BACK]
@@ -137,7 +138,7 @@ Plain dashes, paste straight into the prompter. CAPS = hit it harder.
 
 === 6:00  CLOSE  (30s) ===
 
-- Cost is measured, not guessed. Six cents a lead, about three dollars a full run.
+- Cost is measured, not guessed. It's on screen - this run cost two dollars eighty-six, over twenty calls and fifty-five web searches. Six cents a lead.
 - One thing on tooling. The scraping goes through Apify because I already had an account and could be running the same afternoon.
 - It's a marketplace of other people's scrapers. Not a data provider.
 - Two of them doing the same job handed back completely different shapes of data.
@@ -155,6 +156,12 @@ Plain dashes, paste straight into the prompter. CAPS = hit it harder.
 - The Cognism and Otterly detail. Just say "I'd buy the data, not the scraper."
 - The whole LEAD LOGIC section. 40 seconds, nice to have, not essential.
 - The "see what winning looks like" click.
+
+
+=== BETWEEN TAKES ===
+
+- python -m aeo.leads --reset      (clears your rehearsal lookups, free, instant)
+- THEN RELOAD THE PAGE. The row stays on screen until you do.
 
 
 === REMINDERS ===

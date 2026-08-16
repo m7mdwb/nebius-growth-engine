@@ -157,8 +157,8 @@ hold. Rather than score that zero, I take the points out of the total and say wh
 whether it's three out of ten, or three out of ten with four you never checked.
 
 *[Source gap.]* This is the part I'd act on. Knowing we lose ten questions isn't useful.
-Knowing the answers beating us lean on forty-three blog roundups, three analyst pieces
-and two competitors' own sites tells you exactly where to go.
+Knowing the answers beating us lean on a hundred and two blog roundups, four analyst
+pieces and two competitors' own sites tells you exactly where to go.
 
 *[Recommendations.]* The model writes these, then a plain lookup checks every source it
 names against what we actually collected.

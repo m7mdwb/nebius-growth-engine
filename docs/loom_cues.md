@@ -72,7 +72,7 @@ Not a script. Glance, say it your way, move.
 - Second half: do we show up when someone asks an AI assistant
 - **Two striped paths. Not the same claim.**
 - 40 we never asked — no keys, and I say so
-- 20 we asked, nothing came back — my credit ran out
+- 2 we asked, nothing came back — empty answers (an earlier run had 20, when credit died)
 - Both "not measured", both out of the percentages
 - Second number climbing = broken tool. First high = just narrower.
 - Letting either read "we're not there" = reporting my own missing API key as a fact about the market
@@ -81,7 +81,7 @@ Not a script. Glance, say it your way, move.
 *[Click AI visibility]*
 
 - One number, comes apart
-- **1 of 90, not 1 of 100** — nothing named us, so no rank to score
+- **0 of 90, not 0 of 100** — nothing named us, so no rank to score
 - Took those points out rather than scoring zero
 - **0 of 10.** Count, not percentage.
 - 30% looks the same as 3-of-10-with-4-never-checked
@@ -89,13 +89,13 @@ Not a script. Glance, say it your way, move.
 *[Source gap]*
 - **This is the part I'd act on**
 - Losing ten questions isn't useful
-- 43 blog roundups, 3 analyst pieces, 2 competitor sites → that's where to go
+- 102 blog roundups, 4 analyst pieces, 2 competitor sites → that's where to go
 
 *[Recommendations]*
 - Model writes them, lookup checks every source against what we collected
 
 *[Click "See what winning looks like"]*
-- Seeded data, same screen. **1 of 90 → 55 of 100.**
+- Seeded data, same screen. **0 of 90 → 55 of 100.**
 - Says it's seeded because the flag lives in the row, not a caption
 *[Click back]*
 

@@ -92,15 +92,15 @@ One story here, and it is the best one in the repo:
 
 ## 3:30 – 5:30 · AI visibility — the harder half
 
-1. **Score: 1 of 90.** Do not apologise for it. *"One number, and it comes apart. Answer
+1. **Score: 0 of 90.** Do not apologise for it. *"One number, and it comes apart. Answer
    rank is excluded — nothing named us, so there is no position to hold, and those ten
    points are held out of the denominator rather than scored as a failure. That is why it
-   reads 1 of 90 and not 1 of 100."*
+   reads 0 of 90 and not 0 of 100."*
 2. **0 of 10.** *"A count, never a percentage — a percentage hides its denominator, and
    the denominator is where these dashboards lie. And the branded controls are excluded:
    asking 'what is Nebius Academy' and counting the answer is free marks."*
 3. **The source gap — this is the slide a CMO acts on.** *"Knowing we lose ten queries is
-   not actionable. Knowing the answers that beat us lean on 43 editorial roundups, three
+   not actionable. Knowing the answers that beat us lean on 102 editorial roundups, four
    analyst pieces and two competitor blogs names the places to go and get placed. And the
    classification is a lookup, not a model call — a source type that changed its mind
    between runs would make every recommendation unreproducible."*
@@ -108,7 +108,7 @@ One story here, and it is the best one in the repo:
    of 34 cited domains were also ranking organically for the same query, captured from the
    same response. So here, ranking still buys citations — the lever is placement on pages
    that already rank, not a new content programme."*
-5. **Click "See what winning looks like →".** 1 of 90 becomes 55 of 100.
+5. **Click "See what winning looks like →".** 0 of 90 becomes 55 of 100.
    *"Same board, seeded data — and the banner says so, because the flag lives in the
    database row, not in a caption. This is what the tool looks like once placements land,
    and it is why the zero is a starting line rather than a dead end."* Click back.

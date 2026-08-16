@@ -171,7 +171,7 @@ error, a refusal, an empty answer from a live engine) leaves after the call. Bot
 `unmeasured`, neither is ever `absent`, and both are drawn with the same hatch this page
 has used for "nobody looked" since the first screen.
 
-⚠️ **On the current run that reads 40 and 20, and the 20 is a scar.** It used to read
+⚠️ **On run 3 that read 40 and 20, and the 20 was a scar.** It used to read
 `40 and 0`, and this file used to celebrate that zero — wrongly. Commit `925e5b1` fixed
 `classify()` so an errored engine stores as `unmeasured`, but it never migrated the rows
 already written, so run 3 still held **20 Claude readings that failed with HTTP 400 when
@@ -186,7 +186,7 @@ status underneath them was a lie, waiting for the first consumer that read `stat
 directly. The Logic tab was that consumer. Corrected by
 `scripts/fix_errored_status.py` — committed rather than run quietly, because a silent
 `UPDATE` against measurement history is its own version of the same sin. **The benchmark
-and the score did not move (0 of 10, 1 of 90), which is the proof the correction touched
+and the score did not move (0 of 10, 1 of 90 at the time), which is the proof the correction touched
 only the stored status and no reported number.**
 
 Both Logic tabs work in the standalone export as well as the live app — verified, they
@@ -221,7 +221,7 @@ argument:
    `config/queries.yaml` (hashed separately as `score_hash`, the analogue of Track A's
    `fit_hash`), every component rendered with its own points and the sentence that
    produced it, and **any component that could not be measured is excluded from the
-   denominator rather than scored as zero.** The real run reads **1 of 90** — answer
+   denominator rather than scored as zero.** The current run (8) reads **0 of 90** — answer
    rank is unmeasurable when nothing named us, so its 10 points are held out and said
    so. A seeded run reads **55 of 100** with all four live.
    This also settles an inconsistency: Track A scored leads out of ~100 with every

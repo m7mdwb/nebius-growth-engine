@@ -21,7 +21,7 @@ cells nobody looked at. Today it is **0 of 10**. Target 10 of 10.
   zero long after citations move — judging the programme on it in quarter one kills it.
 - The 0–100 score never blends out of sight: four components each keep their own points,
   and one we could not measure is **excluded from the denominator** rather than scored zero
-  (today 1 of 90 — nothing named us, so there is no position to hold).
+  (today 0 of 90 — nothing named us, so there is no position to hold).
 
 **Track A — headline: speed-to-lead against the SLA.** What share of `hot` leads were
 contacted inside five minutes. Biggest single lever on inbound conversion.

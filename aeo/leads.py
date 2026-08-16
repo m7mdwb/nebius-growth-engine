@@ -817,7 +817,32 @@ def main() -> int:
 
     ap = argparse.ArgumentParser(description="Run the sample leads end to end.")
     ap.add_argument("--limit", type=int, help="process only the first N samples")
+    ap.add_argument(
+        "--reset", action="store_true",
+        help="drop manual lookups from the latest run and stop. No API calls, no cost. "
+             "Rehearsing a demo appends a row each time, and this puts the sample set "
+             "back without paying to re-collect it.")
     args = ap.parse_args()
+
+    if args.reset:
+        # Only rows this pipeline recorded as `manual_lookup` — the batch samples come
+        # from leads.yaml with their own source and are left alone. Deliberately not a
+        # wipe of the whole run: that would cost a re-collection to undo.
+        from . import db
+        with db.session() as conn:
+            rid = db.latest_lead_run_id(conn)
+            if rid is None:
+                print("no lead run to reset")
+                return 0
+            n = conn.execute(
+                "DELETE FROM leads WHERE run_id = ? AND source = 'manual_lookup'", (rid,)
+            ).rowcount
+            conn.commit()
+            rows = db.leads(conn, rid)
+        print(f"removed {n} manual lookup(s) from lead run {rid}")
+        for r in rows:
+            print(f"  - {r['name']:<22} {str(r.get('score')):>5}  {r['route']}")
+        return 0
 
     fit = load_fit()
     rows = fit.samples[: args.limit] if args.limit else None
