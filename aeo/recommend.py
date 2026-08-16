@@ -19,6 +19,7 @@ edges of its evidence will happily recommend acting on things nobody measured.
 from __future__ import annotations
 
 import json
+import re
 
 from .config import Config, env
 
@@ -132,7 +133,75 @@ def _fmt_per_query(gap: dict) -> str:
     return "\n".join(out)
 
 
-def build(bench: dict, gap: dict, seo: dict, summary: dict, cfg: Config) -> dict:
+# A domain, loosely. Deliberately not exhaustive on TLDs — a miss means a claim goes
+# unchecked, which is the safe direction; a false hit would flag a REAL citation and
+# teach the reader to ignore the warning, which is worse than having no check.
+#
+# ⚠️ The label group is greedy and multi-part on purpose. Matching a single label plus
+# a TLD found "blog.academy" inside "blog.academy.nebius.com", because `academy` is
+# itself a TLD — flagging a subdomain of our own site as a fabricated citation. The
+# lookbehind stops a match starting mid-domain for the same reason.
+_DOMAIN_RE = re.compile(
+    r"(?<![\w.])((?:[a-z0-9][a-z0-9-]{0,62}\.)+(?:com|org|net|io|ai|co|edu|dev|us|uk|"
+    r"de|fr|nl|eu|es|it|se|ch|at|be|pl|cz|ie|no|dk|fi|info|news|blog|tech|cloud|"
+    r"academy))\b",
+    re.IGNORECASE)
+
+
+def check_evidence(out: dict, gap: dict, summary: dict, cfg: Config,
+                   citations: list[dict] | None = None) -> dict:
+    """Verify every domain the model cites as EVIDENCE actually exists in the data.
+
+    🔑 The one thing missing from "rules assemble the evidence, the model writes". The
+    model is handed a table it cannot argue with — and then nothing checked that what
+    it wrote back corresponds to that table. A fabricated citation is the single worst
+    output this step can produce, because it is indistinguishable from a real one at a
+    glance and it is the part a CMO would act on.
+
+    Scope is deliberately the `evidence` array and nothing else. That field's whole job
+    is "the data points this rests on", so a domain appearing there MUST be in the data.
+    The `why` and `title` are excluded on purpose: a recommendation may legitimately
+    name a domain we are NOT on — "get listed on g2.com" is the entire point of the
+    source gap — and flagging that would punish the tool for working.
+
+    This is a lookup, not a second model call, for the same reason the source
+    classification is: a check that changes its mind between runs cannot be a control.
+    """
+    # ⚠️ Build the pool from the RAW citations when they are available, never from the
+    # summarised views alone. Those are display lists — most_common(20) for the domain
+    # table, six per source kind, eight per query — so a genuinely cited domain that
+    # falls outside a cap is absent from them. Caught in testing: edstellar.com, a real
+    # citation in this very run, was flagged as fabricated because it sat below the
+    # cut-off. A check that fires on real data is worse than no check, because it
+    # trains the reader to ignore it.
+    known = {d.lower() for d in cfg.owned_domains}
+    known |= {(c.get("domain") or "").lower() for c in (citations or [])}
+    known |= {(d.get("domain") or "").lower() for d in summary.get("domains", [])}
+    for k in gap.get("kinds", []):
+        known |= {(d.get("domain") or "").lower() for d in k.get("top_domains", [])}
+    for q in gap.get("per_query", []):
+        known |= {(d.get("domain") or "").lower() for d in q.get("domains", [])}
+    known.discard("")
+
+    checked, unsupported = 0, []
+    for i, r in enumerate(out.get("recommendations") or [], 1):
+        for ev in r.get("evidence") or []:
+            for dom in _DOMAIN_RE.findall(ev or ""):
+                checked += 1
+                d = dom.lower()
+                # Accept a subdomain of something we hold, so blog.example.com passes
+                # when example.com was cited.
+                if d in known or any(d.endswith("." + k) or k.endswith("." + d)
+                                     for k in known):
+                    continue
+                unsupported.append({"n": i, "title": r.get("title", ""), "domain": dom,
+                                    "evidence": ev})
+    return {"domains_checked": checked, "unsupported": unsupported,
+            "known_domains": len(known)}
+
+
+def build(bench: dict, gap: dict, seo: dict, summary: dict, cfg: Config,
+          citations: list[dict] | None = None) -> dict:
     """Assemble the evidence, ask for the recommendations, return them.
 
     Returns {recommendations: [...], seo_verdict, error?}. A failure is a marked seam
@@ -194,4 +263,6 @@ def build(bench: dict, gap: dict, seo: dict, summary: dict, cfg: Config) -> dict
         return {"recommendations": [], "seo_verdict": None,
                 "error": "recommendations were not valid JSON", "raw": text[:400]}
     out["error"] = None
+    # The model wrote it; rules check it. Same division of labour as the scoring.
+    out["evidence_check"] = check_evidence(out, gap, summary, cfg, citations)
     return out

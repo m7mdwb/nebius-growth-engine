@@ -199,6 +199,7 @@ def api_recommendations(run_id: int | None = None) -> JSONResponse:
         analyze.seo_overlap(_seo_rows(obs, cits)),
         analyze.summarise(obs, cits, comps),
         cfg,
+        citations=cits,
     )
     return JSONResponse({"empty": False, "run_id": rid, **out})
 

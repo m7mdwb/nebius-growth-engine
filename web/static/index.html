@@ -785,7 +785,31 @@ function recsPanel(r) {
     <div id="recs-out"></div></section>`;
   if (r.error) return `<div class="note warn"><b>Recommendations unavailable.</b>
     ${esc(r.error)}</div>`;
-  return `${(r.recommendations || []).map((x, i) => `<div class="rec">
+
+  /* Rules check what the model wrote. Every domain in an `evidence` entry has to
+     exist in the citations this run actually collected — a recommendation resting on
+     a source that was never cited is the worst output this step can produce, because
+     it is indistinguishable from a real one at a glance and it is the part someone
+     would act on. Deliberately only the evidence field: a recommendation may quite
+     properly name a domain we are NOT on, since that is the entire point. */
+  const ec = r.evidence_check || {};
+  const bad = ec.unsupported || [];
+  const check = ec.domains_checked
+    ? (bad.length
+        ? `<div class="note warn"><b>${bad.length} cited source${bad.length === 1 ? "" : "s"}
+             could not be found in this run's data.</b> The model was handed the evidence
+             tables and wrote back ${esc(String(ec.domains_checked))} domain reference(s);
+             these are not among the ${esc(String(ec.known_domains))} domains actually
+             cited, so treat them as unsupported rather than measured:
+             ${bad.map(u => `<code>${esc(u.domain)}</code>`).join(" ")}</div>`
+        : `<div class="note"><b>Evidence checked.</b> All
+             ${esc(String(ec.domains_checked))} domain reference(s) in the reasoning below
+             appear in the ${esc(String(ec.known_domains))} domains this run actually
+             cited. The model writes the recommendation; a lookup — not a second model
+             call — verifies it against the table it was given.</div>`)
+    : "";
+
+  return `${check}${(r.recommendations || []).map((x, i) => `<div class="rec">
       <div class="rec-h"><span class="rec-n">${i + 1}</span>
         <b>${esc(x.title)}</b>
         <span class="rec-m">${esc(x.effort)} effort · ${esc(x.horizon)}</span></div>

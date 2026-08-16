@@ -194,7 +194,7 @@ def build_payload(include_personal: bool = False,
     recs = None
     if with_recommendations:
         from . import recommend
-        recs = recommend.build(bench, gap, seo, summary, cfg)
+        recs = recommend.build(bench, gap, seo, summary, cfg, citations=cits)
 
     return {
         "leads": leads_payload,
