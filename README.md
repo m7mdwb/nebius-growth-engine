@@ -1,17 +1,19 @@
 # Nebius Growth Engine
 
 Two working prototypes for the Nebius Academy Growth Marketing Engineer take-home,
-in one app with two tabs.
+in one app. **Track A is the submission; Track C is the second half.**
+
+**Track A — inbound lead engine.** Type a real person's name, surname and work email.
+It finds their actual LinkedIn profile, reads their company, reconciles the record
+against both the email domain *and* the mailbox, scores them on real firmographics,
+routes them hot / warm / revisit-in-6-months, and drafts a first-touch message off
+inferred pain points.
 
 **Track C — Agent Engine Optimization.** Measures how Nebius Academy appears inside AI
 assistants against a fixed set of ten buyer-intent queries, reports it as a count
-(*"we appear in 3 of 10"*, target 10 of 10), works out what the answers that beat us
-cite instead, and turns that into concrete recommendations.
-
-**Track A — inbound lead engine.** Type a real person's name, surname and work email.
-It finds their actual LinkedIn profile, reads their company, scores them on real
-firmographics, routes them hot / warm / revisit-in-6-months, and drafts a first-touch
-message off inferred pain points.
+(*"we appear in 0 of 10"*, target 10 of 10), works out what the answers that beat us
+cite instead, and turns that into concrete recommendations — each one checked back
+against the citations the run actually collected.
 
 Everything below runs against live APIs. Where something is mocked, it is marked in
 the data, not just in a caption.

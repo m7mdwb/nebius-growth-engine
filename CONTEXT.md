@@ -102,11 +102,26 @@ as running software with live adapters rather than as a workflow diagram.
 > scores scope judgment explicitly — *"we'd rather see scope judgment than heroics"* —
 > so shipping two tracks can read as the exact failure it warns about. The framing that
 > answers it, and it needs to be said out loud in the Loom rather than left implied:
-> **Track C is the submission. Track A is the second tab**, and both exist because they
+> **Track A is the submission. Track C is the second half**, and both exist because they
 > are the same engine pointed at two problems — one config file defining the contract,
 > deterministic rules deciding, the model writing only what rules cannot, and every
 > unmeasured cell declared rather than defaulted. That is one argument demonstrated
 > twice, not two assignments.
+
+> 🔄 **This was the other way round until 16 Aug, and the reversal is evidence-based.**
+> An external completeness audit scored every lettered requirement in the brief: **Track A
+> meets 5 of 5 fully; Track C meets 2 fully and 2 partially** (two of four engines are
+> live, and the recurring bonus is built but switched off). Two evaluator-persona reviews
+> then landed on the same thing from the other direction: Track A produces a visibly good
+> outcome in twenty seconds — type a real person, watch it find, score, route and draft
+> them — while **Track C's headline result is a zero**, which is correct and needs a
+> paragraph before it reads as competence rather than a broken tool.
+>
+> Track C is still the stronger *argument* — the source gap is the most original thinking
+> here, and the seam-versus-absence distinction is the spine of the whole repo. But a
+> reviewer trusts that argument more once Track A has already proved the thing ships. The
+> order compounds in one direction and not the other. It also stops the product
+> contradicting the claim: the app opens on the lead engine.
 
 **Track C — Agent Engine Optimization.** A fixed buyer-intent query set plus an optional
 live ad-hoc query, reported as a benchmark: *"we appear in 3 of 10 queries"*, target

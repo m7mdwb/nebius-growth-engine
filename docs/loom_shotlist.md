@@ -29,7 +29,8 @@ they will open the next interview with — answer it before it is asked.
 > rather than let you wonder. They are the same engine pointed at two problems: one config
 > file holds the contract, deterministic rules make every decision, the model does only
 > what rules cannot do, and anything unmeasured is declared instead of quietly scored
-> zero. Track C is the submission. Track A is the second tab. If you think that is the
+> zero. Track A — the inbound lead engine — is the submission. Track C is the second
+> half, because it is the same argument against a harder problem. If you think that is the
 > over-scoping the brief warns about, that is a fair read and I would rather discuss it
 > than hide it."
 
@@ -89,7 +90,7 @@ One story here, and it is the best one in the repo:
 > into a fact about a human being. That is the exact failure this whole submission argues
 > against, and I found it inside my own adapter."
 
-## 3:30 – 5:30 · AI visibility — the submission
+## 3:30 – 5:30 · AI visibility — the harder half
 
 1. **Score: 1 of 90.** Do not apologise for it. *"One number, and it comes apart. Answer
    rank is excluded — nothing named us, so there is no position to hold, and those ten

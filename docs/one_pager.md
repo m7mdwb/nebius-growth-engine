@@ -1,6 +1,6 @@
 # The three questions
 
-**Track C (AEO) is the submission. Track A (inbound leads) is the second tab.** Both are
+**Track A (inbound leads) is the submission. Track C (AEO) is the second half.** Both are
 here because they are one engine pointed at two problems: a config file holds the
 contract, deterministic rules decide, the model does only what rules cannot, and every
 unmeasured cell is declared rather than defaulted to zero.
@@ -14,17 +14,14 @@ percentage: "30%" reads identically whether it is 3 of 10 measured or 3 of 10 wi
 cells nobody looked at. Today it is **0 of 10**. Target 10 of 10.
 
 - **Baseline first: the same ten queries daily for two weeks, to establish the noise
-  band.** Assistant answers are non-deterministic — ask twice, the competitor set moves.
-  Movement smaller than that spread is not a result. The tool already repeats a subset
-  three times per run and reports how many cells contradicted themselves, so the band is
-  measured, not assumed.
-- **Leading indicator: citation share** on the category queries. **Lagging: AI-referred
-  sessions**, which stay near zero long after citations start moving — judging the
-  programme on it in quarter one would kill it unfairly.
-- The 0–100 score exists but never blends out of sight: presence, citation quality,
-  citation share and answer rank each keep their own points, and a component we could not
-  measure is **excluded from the denominator** rather than scored as zero (today: 1 of 90,
-  because nothing named us, so there is no position to hold).
+  band.** Assistant answers are non-deterministic — ask twice, the competitor set moves,
+  and movement smaller than that spread is not a result. The tool already repeats a subset
+  three times per run and reports how many cells contradicted themselves.
+- **Leading indicator: citation share.** **Lagging: AI-referred sessions**, which stay near
+  zero long after citations move — judging the programme on it in quarter one kills it.
+- The 0–100 score never blends out of sight: four components each keep their own points,
+  and one we could not measure is **excluded from the denominator** rather than scored zero
+  (today 1 of 90 — nothing named us, so there is no position to hold).
 
 **Track A — headline: speed-to-lead against the SLA.** What share of `hot` leads were
 contacted inside five minutes. Biggest single lever on inbound conversion.
@@ -55,11 +52,9 @@ neither SQLite nor the arithmetic is near a limit.
 - **Track A (500 leads/week):** at the measured $0.06 a lead that is ~$30/week — **cost is
   not the constraint, accuracy is.** No single B2B provider exceeds ~70% match rate on a
   real inbound list, so one provider means one lead in three arrives blank; chaining three
-  to five lifts it to 85–95%. **Cognism next specifically**, because European enrichment
-  and outbound sit under GDPR legitimate interest — that stopped being a slide the moment
-  this prototype started scraping real people. Then queue the enrichment (a form
-  submission currently blocks on three HTTP calls) and **write back to the CRM** — scoring
-  is worthless if sales must open a separate dashboard to see it.
+  to five lifts it to 85–95%. Then queue the enrichment (a form submission currently blocks
+  on three HTTP calls) and **write back to the CRM** — scoring is worthless if sales must
+  open a separate dashboard to see it.
 
 ## 3. One tradeoff, and what production would do differently
 
@@ -67,14 +62,24 @@ neither SQLite nor the arithmetic is near a limit.
 this account, so the count reflects Claude and Google AI Overviews only.
 
 I made that a **declared seam** rather than quietly reporting a smaller matrix: an engine
-with no credential is stored `unmeasured`, excluded from every rate, and drawn hatched —
-because "we did not look" and "we looked and found nothing" are different findings, and a
-rate whose denominator silently swallows unmeasured cells is the exact error this tool
-exists to catch elsewhere. **Production closes it with two API keys.**
+with no credential is stored `unmeasured`, excluded from every rate, and drawn hatched,
+because "we did not look" and "we looked and found nothing" are different findings.
+**Production closes it with two API keys** — but not with the OpenAI API alone: querying
+the API is not querying ChatGPT, and a cell reading "ChatGPT: cited" sourced from a
+different surface is a worse lie than an honest blank.
 
-I would also not close it with the OpenAI API alone: querying the API is not querying
-ChatGPT, and a cell labelled "ChatGPT: cited" sourced from a different surface would be a
-worse lie than the honest blank.
+**Apify is a convenience, not a recommendation.** Every scrape here runs through it because
+I already had an account and could be live the same afternoon. It is a **marketplace of
+third-party scrapers, not a data vendor**, and the build showed what that costs: two actors
+doing the same job returned incompatible shapes, so a working scrape silently produced a
+title parsed from marketing copy, and free-plan gating changed the failure mode twice
+mid-project. Production buys the data, not the scraper — **Cognism** for European
+firmographics with lawful basis and DNC screening, **Clay** to orchestrate past three
+providers. On the AEO side Apify is a workaround for a surface with **no official API**
+(Serper returns no AI Overview field — tested), so production uses a SERP provider with
+native AI Overview support, or buys the monitoring outright: **Otterly ~$29/month, Peec
+~€89**. If Nebius only wants monitoring, buy it — what is worth keeping from this build is
+the source gap and the recommendation layer, the part none of them do.
 
 **Smaller ones:** one locale (English); headcount growth needs a second sighting, so it is
 worth nothing on day one and everything by month three; competitor discovery misses rivals
@@ -83,8 +88,7 @@ discussed but never linked.
 ---
 
 **Why building beat diagramming.** Every adapter here was written from documentation and
-had never been executed. Running it found five faults, and **four fail silently** —
-plausible output, no error: Claude answering with zero parseable citations; two Apify
-adapters dead on a renamed argument; a wrong input key making a paid scraper return zero
-items, indistinguishable from "no profile exists"; seniority rules with no C-suite row, so
-a CEO scored zero. None are visible in a workflow diagram.
+had never been executed. Running it found five faults and **four fail silently** —
+plausible output, no error. A wrong input key made a paid scraper return zero items,
+indistinguishable from "this person has no profile." None of them are visible in a
+workflow diagram.

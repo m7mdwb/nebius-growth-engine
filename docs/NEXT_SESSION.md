@@ -12,7 +12,7 @@ Read CONTEXT.md first — it is the standing brief and it opens with the current
 state and the one blocking action.
 
 This is the Nebius Academy take-home, due Monday 17 Aug EOD. Track C (AEO) is the
-submission, Track A (inbound leads) is the second tab. Both run against live APIs.
+second half; Track A (inbound leads) is the submission. Both run against live APIs.
 The scored artifact is a 5–8 minute Loom of it running, not a deck.
 
 Before anything else:
@@ -94,8 +94,8 @@ spend is measured now, not estimated.
 3. **No GitHub remote yet.** The brief asks for a repo link. `gh repo create
    m7mdwb/nebius-growth-engine --private`, push, then confirm no secret ever
    entered history.
-4. **Record the Loom.** Say three things out loud: Track C is the submission and
-   Track A is the second tab (the brief says pick one and scores scope judgment);
+4. **Record the Loom.** Say three things out loud: Track A is the submission and
+   Track C is the second half (the brief says pick one and scores scope judgment);
    the cron is off on purpose and why; the behavioural signals are mocked while
    the firmographics are real.
 
