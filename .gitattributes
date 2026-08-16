@@ -1,0 +1,28 @@
+# Binary files must never be line-ending converted.
+#
+# ⚠️ Git warned "LF will be replaced by CRLF" when committing docs/one_pager.pdf,
+# which is git offering to corrupt a binary. Nothing was damaged on the way in — the
+# stored blob is byte-identical — but the conversion also runs on CHECKOUT, so a
+# reviewer cloning on a machine with core.autocrlf=true could have ended up with a
+# broken PDF and no idea why. The database is the worse case: a corrupted SQLite file
+# fails at import time with something unhelpful.
+#
+# Marking them binary settles it in both directions, for every clone.
+*.pdf   binary
+*.docx  binary
+*.db    binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+
+# Text files: normalise to LF in the repository, whatever the author's platform does
+# locally. This repo was written on Windows and will be read on macOS and Linux.
+*.py    text eol=lf
+*.md    text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.html  text eol=lf
+*.txt   text eol=lf
+*.json  text eol=lf
