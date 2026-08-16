@@ -28,10 +28,45 @@ Two permissions in the brief that this build leans on directly: mocked pieces ar
 allowed **if the seam is clearly marked**, and AI use is expected rather than
 tolerated (*"How you use them is part of what we're evaluating"*).
 
-## 🚦 Where things stand — read this first
+## ✅ SUBMITTED — 16 August 2026
 
-**Anthropic credit topped up 15 Aug. Apify on the paid Starter plan 15 Aug.
-`scripts/probe.py` = 5/5 PASS.** Both tracks run, every integration verified live.
+Sent by reply to the assignment thread, a day before the Monday 17 August deadline.
+
+| | |
+|---|---|
+| Loom, 7 min | `https://www.loom.com/share/5a3c3669d7834126b0f4ffef454956e9` |
+| Repo, **public** | `https://github.com/m7mdwb/nebius-growth-engine` |
+| One-pager PDF | `https://m7mdwb.github.io/nebius-growth-engine/one_pager.pdf` |
+| Dashboard, no install | `https://m7mdwb.github.io/nebius-growth-engine/standalone_report.html` |
+
+**Public, not private.** A private repo 404s for everyone the submission gets forwarded
+to — TA, then CMO, then the growth team, then CRO — until each of their GitHub usernames
+has been collected. Pages then serves the report and the PDF as direct links for the
+reviewer who will not clone anything. A zip was rejected: mail filters strip zips
+containing code.
+
+**Verified before publishing:** `.env` never committed, no key patterns in any blob in
+history, and the two database journal blobs that did enter history (`a92704f`, removed
+at `925e5b1`) scanned clean. `data/aeo.db` has never been tracked.
+
+**What was said in the email, and should be said again if asked:** two tracks were built
+where the brief said pick one, Track A is the submission, and the one question that would
+have gone to Laure Faretti — *should the AI-visibility query set be Europe-specific?* —
+became a stated assumption instead, because no address for her could be found.
+
+### The state it was submitted in
+
+`scripts/probe.py` = 5/5 PASS. Apify on the paid Starter plan since 15 Aug, Anthropic
+credit topped up the same day.
+
+- **Track C, run 8** — collected 16 Aug, 80 observations, **zero errors**, $2.8647 over
+  20 calls and 55 web searches. Score **0 of 90** (answer rank excluded), benchmark
+  **0 of 10**, **40 seam readings against 2 dead air**, 102 editorial citations on the
+  lost queries, SEO overlap 39 of 72.
+- **Track A, lead run 13** — Satya 144 hot, Hanno 124 hot, Christian 95 warm, one
+  disqualified, one needs_review. Four of seven routes fire.
+- Runs 4, 5, 6 are seeded backfill (8, 7 and 3 of 10) and run 3 is the earlier measured
+  one that carries the dead-air scar. All reachable from the run picker.
 
 ### ✅ PERSON ENRICHMENT IS LIVE — it took a click *and* $29
 
@@ -56,12 +91,14 @@ honest unknown. `enrich.py` now normalises per actor and stores `source_actor` i
 trace. **Two actors that answer the same question in different shapes is the reason
 `probe.py` prints the data shape and not just PASS.**
 
-**Current state: `lead run 11`.** All three enrichable leads carry real structured titles,
-exec seniority (+25) and function (+12). Scores 144 / 95 / 124. Four of seven routes fire.
+**As submitted this is `lead run 13`** (11 was the first run after the fix; 13 is the
+clean one recorded against). All three enrichable leads carry real structured titles,
+exec seniority (+25) and function (+12). Scores 144 / 95 / 124.
 
-⚠️ **Apify is a $5/month free plan and is the binding constraint on this whole project**
-— it funds Track A enrichment *and* the Track C AI Overviews engine. ~$1.63 used.
-Rehearse Track C with `--limit 3 --engine claude` (zero Apify).
+✅ **Apify is on the paid Starter plan since 15 Aug** ($29, and it is spendable credit
+rather than a fee). It stopped being the binding constraint the moment it was paid.
+Still rehearse Track C with `--limit 3 --engine claude` when iterating — a full run is
+~$2.86 and about 40 minutes, not the 25 this file used to claim.
 
 ### 🔑 The bug that block taught us, and it is the best story in the repo
 
