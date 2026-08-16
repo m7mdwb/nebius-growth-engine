@@ -166,8 +166,32 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _bootstrap_from_demo(path: Path) -> None:
+    """A fresh clone has no database. Seed it from the shipped demo copy.
+
+    🔑 CONSTRAINT 4, and why this is a COPY rather than the real thing. `data/aeo.db`
+    holds real scraped people — names, work emails, LinkedIn URLs, and drafts addressed
+    to them by name — so it is gitignored and stays that way. `data/demo.db` is the same
+    database with every identifying field redacted by `scripts/make_demo_db.py`, and it
+    is what ships.
+
+    Copied rather than opened in place, so the first thing a reviewer does cannot write
+    into a file tracked by git. They get a working board in one command; the shipped
+    copy stays pristine.
+    """
+    demo = path.parent / "demo.db"
+    if path.exists() or not demo.exists():
+        return
+    import shutil
+    path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(demo, path)
+    print(f"seeded {path.name} from the shipped demo database "
+          f"(redacted — see scripts/make_demo_db.py)")
+
+
 def connect(path: Path | None = None) -> sqlite3.Connection:
     path = path or DB_PATH
+    _bootstrap_from_demo(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row

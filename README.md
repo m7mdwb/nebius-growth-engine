@@ -32,17 +32,28 @@ people and this file is meant to be shared (see *Constraint 4* below).
 ### Run the app itself, without any keys — 60 seconds
 
 ```bash
-pip install -r requirements.txt              # Python 3.11+
-python scripts/seed_synthetic.py --weeks 3   # marked backfill, so the board has data
-python scripts/seed_synthetic.py --snapshots # marked prior headcount, so growth computes
-uvicorn web.app:app --reload                 # http://127.0.0.1:8000
+pip install -r requirements.txt      # Python 3.11+
+uvicorn web.app:app --port 3000      # http://localhost:3000
 ```
 
-⚠️ **Do the seed step.** A fresh clone has no database, so without it every tab renders
-an honest but unhelpful *"No runs yet"*. The seeded runs are flagged `is_synthetic = 1`
-**in the data**, so the dashboard puts a red banner across the top rather than letting
-invented history read as measurement — that flag is a feature of the tool, not a caveat
-in this README.
+That is the whole thing. **No keys, no signup, no seeding.** The repo ships
+`data/demo.db`, and the first time you open the app it copies that into place and says
+so. You get five Track C runs, 232 observations, the five sample leads with their
+scores and routing, both flowcharts, and the written recommendations — all of it
+really collected, just not by you.
+
+⚠️ **`data/demo.db` is redacted, and that is deliberate.** Track A scrapes live
+LinkedIn profiles, so the working database holds real names, work emails, profile URLs
+and drafts addressed to people by name. That file is gitignored and stays that way.
+What ships is a copy with every identifying field removed — including the ones the
+*model* wrote, since pain points are generated prose and it writes people into them.
+Built and verified by `python scripts/make_demo_db.py --check`, which reads the
+shipped bytes rather than trusting the code that produced them.
+
+Everything renders without keys. What needs a key is **collecting new data** — the two
+Run buttons, the lead lookup, the ad-hoc query and the recommendations each return a
+marked seam instead of a result, and the app says so in a banner at the top rather
+than failing obscurely.
 
 ### Run it live, against real APIs
 

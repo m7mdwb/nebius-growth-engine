@@ -887,6 +887,7 @@ function render(d, t) {
     : "";
 
   $("#app").innerHTML =
+    setupBanner(CONFIG && CONFIG.keys) +
     synthBanner +
     scorePanel(d.score) +
     benchmarkHero(d.benchmark) +
@@ -1211,6 +1212,7 @@ function renderLeads(d) {
        Run the app locally to see the unredacted records.</div>` : "";
 
   $("#app").innerHTML =
+    setupBanner(CONFIG && CONFIG.keys) +
     leadTiles(s) +
     redacted +
     (EMBED ? "" : leadForm()) +
@@ -1624,6 +1626,29 @@ function keyChips(keys) {
   el.innerHTML = keys.map(k =>
     `<span class="keychip ${k.present ? "on" : ""}" title="${esc(k.unlocks)}">
        ${esc(k.name)} ${k.present ? "set" : "not set"}</span>`).join("");
+}
+
+/* Told once, at the top, when the credentials for the LIVE half are absent.
+   ⚠️ ChatGPT and Perplexity are excluded on purpose — those two are declared seams
+   by design, not a setup problem, and listing them here would tell a reviewer to go
+   and fix something that is meant to be missing. This banner is only about the
+   difference between "you are reading a shipped snapshot" and "you can collect your
+   own", which is a distinction nobody can infer from a dashboard full of data. */
+function setupBanner(keys) {
+  const need = (keys || []).filter(k =>
+    !k.present && ["ANTHROPIC_API_KEY", "APIFY_TOKEN", "SERPER_API_KEY"].includes(k.name));
+  if (!need.length) return "";
+  return `<div class="note warn" style="margin:0 0 16px">
+    <b>No API keys, so this is the shipped snapshot — every number on it was really
+    collected, just not by you.</b>
+    Missing: ${need.map(k => `<code>${esc(k.name)}</code>`).join(" ")}.
+    Everything renders and every tab works. What needs a key is <i>collecting new
+    data</i>: <b>Run live collection</b>, <b>Run lead engine</b>, the lead lookup form,
+    the ad-hoc query and <b>Generate recommendations</b> will each return a marked seam
+    rather than a result. Copy <code>.env.example</code> to <code>.env</code>, add the
+    keys, restart, and the chips above turn green — nothing else changes.
+    A lead costs about $0.06 and a full collection about $3.
+  </div>`;
 }
 
 /* The footer argues for whichever track is on screen. It used to carry Track C's
