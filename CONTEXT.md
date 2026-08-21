@@ -7,8 +7,9 @@ is being built, for whom, by when, and the four rules that are not negotiable.
 
 ## The assignment
 
-**Growth Marketing Engineer (B2B), Nebius Academy.** Full brief in
-[docs/assignment_brief.md](docs/assignment_brief.md).
+**Growth Marketing Engineer (B2B), Nebius Academy.** The brief itself is not kept in this
+repo: it is the employer's document and their evaluation instrument, so republishing it
+would leak it to every future candidate. Summarised below instead.
 
 **Due: Monday 17 August 2026, end of day.**
 
